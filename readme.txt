@@ -1,0 +1,1 @@
+Shoutout goes to freem for the Neo Geo guide- http://ajworld.net/neogeodev/beginner/
