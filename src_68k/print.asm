@@ -56,19 +56,53 @@ fix_PrintHexByte:
 	;print high nybble
 	move.b d1,d0
 	lsr.b #$4,d0 ;isolate high nybble
-	cmp.b #$A,d0
-	bcs .9orLess
-		add.b #ASCII_A_BASE,d0
-		jmp .doneAdd
-	.9orLess:
-		add.b #ASCII_BASE,d0
-	.doneAdd:
-	or.w d2,d0
-	move.w d0,LSPC_DATA
+	jsr printNybble
 	;print low nybble
-	HiNybble: ;label to allow local labels to work
 	move.b d1,d0
 	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble
+	jmp printNybble ;jmp instead of jsr because of tail call
+
+; fix_PrintHexWord
+; Prints a word on the Fix layer.
+
+; (Params)
+; d0 - [word] Fix layer X position
+; d1 - [word] Fix layer y position
+; d2 - [byte] Palette number and page number
+; a0 - [long] Pointer to word to print	
+fix_PrintHexWord:
+	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
+	asl.w #$5,d0 ;x position on FIX layer increments by $20
+	add.w d1,d0 ;y position on FIX layer increments by 1
+	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
+	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
+	asl.w #8,d2 ; move byte from param in d2 to upper half of word
+	moveq #$0,d0 ;clear d0
+	move.w (a0),d1 ;load word to print from ram
+	;print high nybble
+	move.w d1,d0
+	rol.w #4,d0 ;isolate high nybble of high word
+	and.w #LO_NYBBLE_MASK,d0
+	jsr printNybble
+	;print low nybble
+	move.w d1,d0
+	lsr.w #8,d0 ;isolate low nybble of high word
+	and.w #LO_NYBBLE_MASK,d0
+	jsr printNybble
+	;print high nybble
+	move.b d1,d0
+	lsr.b #4,d0 ;isolate high nybble of low word
+	jsr printNybble
+	;print low nybble
+	move.b d1,d0
+	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble of high word
+	jmp printNybble ;jmp instead of jsr because of tail call
+
+;utility function for other prints, don't call directly. needs LSPC_ADDR
+;to be set already
+;d0- data to print
+;d2- palette/page number
+printNybble:
 	cmp.b #$A,d0 
 	bcs .9orLess
 		add.b #ASCII_A_BASE,d0

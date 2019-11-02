@@ -192,13 +192,18 @@ User_Main:
 	jsr DrawHello_Routine ; draw "Hello World" string with a routine
 	
 Loop:
-	add.b #$1,frame_count	
-	lea frame_count,a0
+	add.w #$10,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
 	moveq #$3,d2
-	jsr fix_PrintHexByte
+	lea frame_count,a0
+	jsr fix_PrintHexWord
 	
+	lea BIOS_P1CURRENT,a0
+	moveq #$4,d0
+	moveq #$5,d1
+	moveq #$3,d2
+	jsr fix_PrintHexByte	
 	jsr WaitVBlank
 	jmp Loop
 
