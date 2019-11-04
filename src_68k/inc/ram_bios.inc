@@ -94,6 +94,16 @@ BIOS_GAMEDIP_10			equ $10FD93	; (byte) Game soft dip 10
 ; Input Previous/Current/Change/Repeat order:
 ; D,C,B,A,Right,Left,Down,Up
 ;-----------------------------------;
+;Joystick bit numbers:
+JOY_UP    equ $0
+JOY_DOWN  equ $1
+JOY_LEFT  equ $2
+JOY_RIGHT equ $3
+JOY_A     equ $4
+JOY_B     equ $5
+JOY_C     equ $6
+JOY_D     equ $7
+;-----------------------------------;
 ; INPUT_1
 BIOS_P1STATUS			equ $10FD94	; (byte) Controller 1 status
 BIOS_P1PREVIOUS			equ $10FD95	; (byte) Inputs from last frame

@@ -191,7 +191,12 @@ User_Main:
 
 	jsr DrawHello_Routine ; draw string with a routine
 	
-	moveq #$1,d0
+	move.w #0,spr_xPos ;clear variables
+	move.w #0,spr_yPos
+	move.b #$f,spr_xShrink ;x shrink is only 4 bits, set to no shrinking
+	move.b #$ff,spr_yShrink ;y shrink is 8 bits
+	
+	moveq #$1,d0 ;write to palette 1
 	lea WeebPalette,a0
 	jsr LoadPalette
 	
@@ -207,30 +212,93 @@ User_Main:
 			move.w #$100,LSPC_DATA ;palette #1
 			add.w #10,d0
 			dbra d1,.copyColumn
-		sub.w #69,d0
+		sub.w #69,d0 ;tiles go from x to x+60, plus the extra 10 from last loop.
+					 ;get rid of all that, and add 1 to get the start of next col
 		add.w #64,d2 ;next area of SCB1
 		dbra d3,.copyRow
 	
 	
 	move.w #SCB2,LSPC_ADDR
-	moveq #9,d0
+	moveq #9,d1
 	.copySCB2:
-		move.w #$0FFF,LSPC_DATA ;full size, no shrinking
-		dbra d0,.copySCB2
+		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+		dbra d1,.copySCB2
 	
-	move.w #SCB3,LSPC_ADDR 
-	move.w #((496-80)<<7)|7,LSPC_DATA ;y pos
+	move.w #SCB3,LSPC_ADDR
+	move.w spr_yPos,d0
+	move.w #496,d1
+	sub.w d0,d1
+	asl.w #7,d1
+	or.w #7,d1
+	move.w d1,LSPC_DATA
+	
 	move.w #8,d0 ;sticky bits for remaining 9 sprites
 	.copySCB3:
 		move.w #$40,LSPC_DATA
 		dbra d0,.copySCB3
 	
 	move.w #SCB4,LSPC_ADDR
-	move.w #(64<<7),LSPC_DATA ;x pos
+	move.w spr_xPos,d0
+	asl.w #7,d0
+	move.w d0,LSPC_DATA ;x pos
 	
 	
 	
 Loop:
+	move.b BIOS_P1CURRENT,d0
+	btst.b #JOY_UP,d0
+	beq .NoUp
+		sub.w #1,spr_yPos
+	.NoUp:
+	btst.b #JOY_DOWN,d0
+	beq .NoDown
+		add.w #1,spr_yPos
+	.NoDown:
+	btst.b #JOY_LEFT,d0
+	beq .NoLeft
+		sub.w #1,spr_xPos
+	.NoLeft:
+	btst.b #JOY_RIGHT,d0
+	beq .NoRight
+		add.w #1,spr_xPos
+	.NoRight:
+	btst.b #JOY_A,d0
+	beq .NoA
+		sub.b #1,spr_xShrink
+	.NoA:
+	btst.b #JOY_B,d0
+	beq .NoB
+		add.b #1,spr_xShrink
+	.NoB:	
+	btst.b #JOY_C,d0
+	beq .NoC
+		sub.b #1,spr_yShrink
+	.NoC:	
+	btst.b #JOY_D,d0
+	beq .NoD
+		add.b #1,spr_yShrink
+	.NoD:
+	
+	move.w #1,LSPC_INCR
+	move.w #SCB2,LSPC_ADDR
+	moveq #9,d1 ;10 sprites - 1
+	.copySCB2:
+		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+		dbra d1,.copySCB2
+	
+	move.w #SCB3,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
+	move.w spr_yPos,d0
+	move.w #496,d1
+	sub.w d0,d1
+	asl.w #7,d1
+	or.w #7,d1
+	move.w d1,LSPC_DATA
+	
+	move.w #SCB4,LSPC_ADDR
+	move.w spr_xPos,d0
+	asl.w #7,d0
+	move.w d0,LSPC_DATA ;x pos
+	
 	add.w #$10,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
