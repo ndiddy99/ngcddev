@@ -189,7 +189,46 @@ User_Main:
 	; routine for this purpose as well.
 	jsr LSP_1st ; jump to the LSP_1st subroutine
 
-	jsr DrawHello_Routine ; draw "Hello World" string with a routine
+	jsr DrawHello_Routine ; draw string with a routine
+	
+	moveq #$1,d0
+	lea WeebPalette,a0
+	jsr LoadPalette
+	
+	move.w #$1,LSPC_INCR
+	moveq #$9,d3 ;loop counter
+	moveq #$0,d0 ;initial tile column #
+	move.w #SCB1,d2 ;initial location to copy to
+	.copyRow:
+		moveq #$6,d1 ;loop counter
+		move.w d2,LSPC_ADDR
+		.copyColumn:
+			move.w d0,LSPC_DATA ;tile #
+			move.w #$100,LSPC_DATA ;palette #1
+			add.w #10,d0
+			dbra d1,.copyColumn
+		sub.w #69,d0
+		add.w #64,d2 ;next area of SCB1
+		dbra d3,.copyRow
+	
+	
+	move.w #SCB2,LSPC_ADDR
+	moveq #9,d0
+	.copySCB2:
+		move.w #$0FFF,LSPC_DATA ;full size, no shrinking
+		dbra d0,.copySCB2
+	
+	move.w #SCB3,LSPC_ADDR 
+	move.w #((496-80)<<7)|7,LSPC_DATA ;y pos
+	move.w #8,d0 ;sticky bits for remaining 9 sprites
+	.copySCB3:
+		move.w #$40,LSPC_DATA
+		dbra d0,.copySCB3
+	
+	move.w #SCB4,LSPC_ADDR
+	move.w #(64<<7),LSPC_DATA ;x pos
+	
+	
 	
 Loop:
 	add.w #$10,frame_count	
@@ -228,10 +267,30 @@ str_HelloWorld2: dc.b "Hello World!",$FF,$00 ; unused, presented as example only
 ; Uses the fix_PrintString to print the "Hello World" string to the screen.
 
 DrawHello_Routine:
-	moveq #$6,d0
-	moveq #$10,d1 ;
+	moveq #$6,d0 ;x pos
+	moveq #$7,d1 ;y pos
 	moveq #$03,d2 ; Palette 0, Page 3
 	; (moveq is used to clear out any garbage from the top bits, since it will be shifted later.)
 	lea str_HelloWorld,a0 ; load pointer to string into a0
 	jsr fix_PrintString ; jump to the print string subroutine
 	rts
+
+WeebPalette:
+	dc.w $B423,$3744,$0855,$7A65,$A869,$3C88,$4CA9,$4CBC,$0FB9,$0FDB,$1FDC,$2FED,$0FEF,$5FFF,$6FFF,$FFFF
+
+;copies palette into palette ram
+;d0- palette number to copy to (long)
+;a0- pointer to palette to copy
+LoadPalette:
+	asl.w #$5,d0 ;multiply d0 by $20 to get where to write in palette ram
+	add.l #PALETTES,d0
+	move.l d0,a1 ;address to a1
+	moveq #$F,d0 ;16 colors - 1
+	.LoadLoop:
+		move.w (a0)+,(a1)+ ;copy stuff from wram to palette ram
+		dbra d0,.LoadLoop
+	rts
+	
+	
+
+	
