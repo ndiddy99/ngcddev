@@ -104,12 +104,29 @@ VBlank:
 
 	; [Things to perform in VBlank]
 	; VBlank is where you should be doing sprite data updates (SCB writes) and
-	; palette RAM updates. However, this demo doesn't use either...yet.
-
-	; SNK also wants you to call SYSTEM_IO every 1/60th of a second. (probably 1/50th on PAL)
-	; This is pretty important, otherwise the RAM locations for input variables
-	; don't get updated (unless you do it yourself), among other things.
+	; palette RAM updates.
+	;update RAM locations for joypad inputs
 	jsr SYSTEM_IO
+	
+	move.w #1,LSPC_INCR
+	move.w #SCB2+1,LSPC_ADDR
+	moveq #9,d1 ;10 sprites - 1
+	.copySCB2:
+		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+		dbra d1,.copySCB2
+	
+	move.w #SCB3+1,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
+	move.w spr_yPos,d0
+	move.w #496,d1
+	sub.w d0,d1
+	asl.w #7,d1
+	or.w #7,d1 ;sprite is 7 tiles high
+	move.w d1,LSPC_DATA
+	
+	move.w #SCB4+1,LSPC_ADDR
+	move.w spr_xPos,d0
+	asl.w #7,d0
+	move.w d0,LSPC_DATA ;x pos
 	
 
 .VBlank_end:
@@ -188,11 +205,9 @@ User_Main:
 	; Sprites will need to be initialized as well. The System ROM provides a
 	; routine for this purpose as well.
 	jsr LSP_1st ; jump to the LSP_1st subroutine
-
-	jsr DrawHello_Routine ; draw string with a routine
 	
-	move.w #0,spr_xPos ;clear variables
-	move.w #0,spr_yPos
+	move.w #80,spr_xPos ;clear variables
+	move.w #80,spr_yPos
 	move.b #$f,spr_xShrink ;x shrink is only 4 bits, set to no shrinking
 	move.b #$ff,spr_yShrink ;y shrink is 8 bits
 	
@@ -200,12 +215,16 @@ User_Main:
 	lea WeebPalette,a0
 	jsr LoadPalette
 	
+	;tell MESS_OUT we're busy messing with the data, so don't run.
+	bset.b	#0,BIOS_MESS_BUSY
+	
+	;set up tiles in SCB1
 	move.w #$1,LSPC_INCR
 	moveq #$9,d3 ;loop counter
 	moveq #$0,d0 ;initial tile column #
-	move.w #SCB1,d2 ;initial location to copy to
+	move.w #SCB1+64,d2 ;initial location to copy to
 	.copyRow:
-		moveq #$6,d1 ;loop counter
+		moveq #6,d1 ;loop counter
 		move.w d2,LSPC_ADDR
 		.copyColumn:
 			move.w d0,LSPC_DATA ;tile #
@@ -217,19 +236,20 @@ User_Main:
 		add.w #64,d2 ;next area of SCB1
 		dbra d3,.copyRow
 	
-	
-	move.w #SCB2,LSPC_ADDR
+	;set up shrink data in SCB2
+	move.w #SCB2+2,LSPC_ADDR
 	moveq #9,d1
 	.copySCB2:
 		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
 		dbra d1,.copySCB2
 	
-	move.w #SCB3,LSPC_ADDR
+	;set up y position data in SCB3
+	move.w #SCB3+1,LSPC_ADDR
 	move.w spr_yPos,d0
 	move.w #496,d1
 	sub.w d0,d1
 	asl.w #7,d1
-	or.w #7,d1
+	or.w #7,d1 ;sprite is 7 tiles high
 	move.w d1,LSPC_DATA
 	
 	move.w #8,d0 ;sticky bits for remaining 9 sprites
@@ -237,11 +257,20 @@ User_Main:
 		move.w #$40,LSPC_DATA
 		dbra d0,.copySCB3
 	
-	move.w #SCB4,LSPC_ADDR
+	;sprite 1's x position in SCB4
+	move.w #SCB4+1,LSPC_ADDR
 	move.w spr_xPos,d0
 	asl.w #7,d0
 	move.w d0,LSPC_DATA ;x pos
 	
+	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
+	
+	;play track 2 from the cd
+	moveq #2,d0 ;play track 2 with loop
+CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
+	tst.b $10F6D9 ;so it might be important?
+	beq CDDALoadLoop
+	jsr BIOSF_CDDACMD
 	
 	
 Loop:
@@ -279,27 +308,7 @@ Loop:
 		add.b #1,spr_yShrink
 	.NoD:
 	
-	move.w #1,LSPC_INCR
-	move.w #SCB2,LSPC_ADDR
-	moveq #9,d1 ;10 sprites - 1
-	.copySCB2:
-		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-		dbra d1,.copySCB2
-	
-	move.w #SCB3,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
-	move.w spr_yPos,d0
-	move.w #496,d1
-	sub.w d0,d1
-	asl.w #7,d1
-	or.w #7,d1
-	move.w d1,LSPC_DATA
-	
-	move.w #SCB4,LSPC_ADDR
-	move.w spr_xPos,d0
-	asl.w #7,d0
-	move.w d0,LSPC_DATA ;x pos
-	
-	add.w #$10,frame_count	
+	add.w #$1,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
 	moveq #$3,d2
@@ -314,34 +323,7 @@ Loop:
 	jsr WaitVBlank
 	jmp Loop
 
-;******************************************************************************;
-; == The Hello World example-specific code begins here. == ;
-;******************************************************************************;
-
-;==============================================================================;
-; Writing Hello World on the Fix Layer with a routine
-;==============================================================================;
-; str_HelloWorld
-; $FF-terminated hello world string, for use with fix_PrintString.
-					 ;012345678901234567890
 str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
-
-; Note that even-length strings will need to be aligned properly, in order to
-; prevent address errors.
-str_HelloWorld2: dc.b "Hello World!",$FF,$00 ; unused, presented as example only
-
-;------------------------------------------------------------------------------;
-; DrawHello_Routine
-; Uses the fix_PrintString to print the "Hello World" string to the screen.
-
-DrawHello_Routine:
-	moveq #$6,d0 ;x pos
-	moveq #$7,d1 ;y pos
-	moveq #$03,d2 ; Palette 0, Page 3
-	; (moveq is used to clear out any garbage from the top bits, since it will be shifted later.)
-	lea str_HelloWorld,a0 ; load pointer to string into a0
-	jsr fix_PrintString ; jump to the print string subroutine
-	rts
 
 WeebPalette:
 	dc.w $B423,$3744,$0855,$7A65,$A869,$3C88,$4CA9,$4CBC,$0FB9,$0FDB,$1FDC,$2FED,$0FEF,$5FFF,$6FFF,$FFFF

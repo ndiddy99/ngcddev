@@ -5,7 +5,7 @@
 	; On the Neo-Geo CD, this flag determines how audio commands are handled.
 	; If the value is 0 or 1, then Z80 RAM address $FEF8 contains the commands.
 	; Any other value will allow you to choose the Z80 address (see $13A below).
-	dc.b $00				; System Version
+	dc.b $02				; System Version
 
 	dc.w $EEEE			; NGH number ($0000 is prohibited)
 	dc.l $00080000		; game prog size in bytes
@@ -27,7 +27,7 @@
 	jmp DEMO_END		; $12E
 	jmp COIN_SOUND		; $134
 
-	dc.w $F800			; $13A: Z80 RAM address for CDDA commands
+	dc.w $FFFF			; $13A: Z80 RAM address for CDDA commands (set to FFFF for default FEF8)
 
 	dc.w $FFFF
 	dc.l $FFFFFFFF,$FFFFFFFF,$FFFFFFFF,$FFFFFFFF

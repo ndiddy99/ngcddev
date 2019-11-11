@@ -1,4 +1,4 @@
 cd c:\ngcd
 make
 pause
-raine\raine32.exe out.iso
+raine\raine32.exe out.cue
