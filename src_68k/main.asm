@@ -15,6 +15,7 @@
 	include "header_cd.inc" ; Neo-Geo CD systems header
 
 	include "print.asm" ;print routines
+	include "sprite.asm" ;sprite copy routines
 ;******************************************************************************;
 ; == The required routines == ;
 ;******************************************************************************;
@@ -219,22 +220,11 @@ User_Main:
 	bset.b	#0,BIOS_MESS_BUSY
 	
 	;set up tiles in SCB1
-	move.w #$1,LSPC_INCR
-	moveq #$9,d3 ;loop counter
-	moveq #$0,d0 ;initial tile column #
-	move.w #SCB1+64,d2 ;initial location to copy to
-	.copyRow:
-		moveq #6,d1 ;loop counter
-		move.w d2,LSPC_ADDR
-		.copyColumn:
-			move.w d0,LSPC_DATA ;tile #
-			move.w #$100,LSPC_DATA ;palette #1
-			add.w #10,d0
-			dbra d1,.copyColumn
-		sub.w #69,d0 ;tiles go from x to x+60, plus the extra 10 from last loop.
-					 ;get rid of all that, and add 1 to get the start of next col
-		add.w #64,d2 ;next area of SCB1
-		dbra d3,.copyRow
+	moveq #1,d0 ;sprite #1
+	moveq #0,d1 ;tile #0
+	moveq #10,d2 ;sprite is 10 tiles wide
+	moveq #7,d3 ;sprite is 7 tiles tall
+	jsr spriteLoad
 	
 	;set up shrink data in SCB2
 	move.w #SCB2+2,LSPC_ADDR
