@@ -100,8 +100,8 @@ fix_PrintHexWord:
 
 ;utility function for other prints, don't call directly. needs LSPC_ADDR
 ;to be set already
-;d0- data to print
-;d2- palette/page number
+;d0 - data to print
+;d2 - palette/page number
 printNybble:
 	cmp.b #$A,d0 
 	bcs .9orLess

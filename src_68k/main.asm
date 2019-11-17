@@ -14,8 +14,12 @@
 ;-- Neo-Geo Header --;
 	include "header_cd.inc" ; Neo-Geo CD systems header
 
+	include "tools\neoconv\map1.map" ;map data
+
 	include "print.asm" ;print routines
 	include "sprite.asm" ;sprite copy routines
+	include "bg.asm" ;bg simulation routines
+	
 ;******************************************************************************;
 ; == The required routines == ;
 ;******************************************************************************;
@@ -109,25 +113,25 @@ VBlank:
 	;update RAM locations for joypad inputs
 	jsr SYSTEM_IO
 	
-	move.w #1,LSPC_INCR
-	move.w #SCB2+1,LSPC_ADDR
-	moveq #9,d1 ;10 sprites - 1
-	.copySCB2:
-		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-		dbra d1,.copySCB2
+	; move.w #1,LSPC_INCR
+	; move.w #SCB2+1,LSPC_ADDR
+	; moveq #9,d1 ;10 sprites - 1
+	; .copySCB2:
+		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+		; dbra d1,.copySCB2
 	
-	move.w #SCB3+1,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
-	move.w spr_yPos,d0
-	move.w #496,d1
-	sub.w d0,d1
-	asl.w #7,d1
-	or.w #7,d1 ;sprite is 7 tiles high
-	move.w d1,LSPC_DATA
+	; move.w #SCB3+1,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
+	; move.w spr_yPos,d0
+	; move.w #496,d1
+	; sub.w d0,d1
+	; asl.w #7,d1
+	; or.w #7,d1 ;sprite is 7 tiles high
+	; move.w d1,LSPC_DATA
 	
-	move.w #SCB4+1,LSPC_ADDR
-	move.w spr_xPos,d0
-	asl.w #7,d0
-	move.w d0,LSPC_DATA ;x pos
+	; move.w #SCB4+1,LSPC_ADDR
+	; move.w spr_xPos,d0
+	; asl.w #7,d0
+	; move.w d0,LSPC_DATA ;x pos
 	
 
 .VBlank_end:
@@ -219,39 +223,44 @@ User_Main:
 	;tell MESS_OUT we're busy messing with the data, so don't run.
 	bset.b	#0,BIOS_MESS_BUSY
 	
-	;set up tiles in SCB1
-	moveq #1,d0 ;sprite #1
-	moveq #0,d1 ;tile #0
-	moveq #10,d2 ;sprite is 10 tiles wide
-	moveq #7,d3 ;sprite is 7 tiles tall
-	jsr spriteLoad
+	; ;set up tiles in SCB1
+	; moveq #1,d0 ;sprite #1
+	; moveq #0,d1 ;tile #0
+	; moveq #10,d2 ;sprite is 10 tiles wide
+	; moveq #7,d3 ;sprite is 7 tiles tall
+	; move.w #$100,d4 ;palette 1, no special attributes
+	; jsr spriteLoad
 	
-	;set up shrink data in SCB2
-	move.w #SCB2+2,LSPC_ADDR
-	moveq #9,d1
-	.copySCB2:
-		move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-		dbra d1,.copySCB2
+	moveq #1,d0
+	lea map1,a0
+	jsr bgLoad
 	
-	;set up y position data in SCB3
-	move.w #SCB3+1,LSPC_ADDR
-	move.w spr_yPos,d0
-	move.w #496,d1
-	sub.w d0,d1
-	asl.w #7,d1
-	or.w #7,d1 ;sprite is 7 tiles high
-	move.w d1,LSPC_DATA
+	; ;set up shrink data in SCB2
+	; move.w #SCB2+2,LSPC_ADDR
+	; moveq #9,d1
+	; .copySCB2:
+		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+		; dbra d1,.copySCB2
 	
-	move.w #8,d0 ;sticky bits for remaining 9 sprites
-	.copySCB3:
-		move.w #$40,LSPC_DATA
-		dbra d0,.copySCB3
+	; ;set up y position data in SCB3
+	; move.w #SCB3+1,LSPC_ADDR
+	; move.w spr_yPos,d0
+	; move.w #496,d1
+	; sub.w d0,d1
+	; asl.w #7,d1
+	; or.w #7,d1 ;sprite is 7 tiles high
+	; move.w d1,LSPC_DATA
+	
+	; move.w #8,d0 ;sticky bits for remaining 9 sprites
+	; .copySCB3:
+		; move.w #$40,LSPC_DATA
+		; dbra d0,.copySCB3
 	
 	;sprite 1's x position in SCB4
-	move.w #SCB4+1,LSPC_ADDR
-	move.w spr_xPos,d0
-	asl.w #7,d0
-	move.w d0,LSPC_DATA ;x pos
+	; move.w #SCB4+1,LSPC_ADDR
+	; move.w spr_xPos,d0
+	; asl.w #7,d0
+	; move.w d0,LSPC_DATA ;x pos
 	
 	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
 	

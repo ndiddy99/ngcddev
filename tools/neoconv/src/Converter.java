@@ -84,8 +84,10 @@ public class Converter {
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
+        writer.println(filename.substring(0, filename.indexOf('.')) + "Pal:");
+        writer.print("\tdc.w ");
         for (int i = 0; i < palettes.size(); i++) {
-            writer.println(String.format("$%04X", palettes.get(i)));
+            writer.print(String.format("$%04X,", palettes.get(i)));
 
         }
         writer.close();
