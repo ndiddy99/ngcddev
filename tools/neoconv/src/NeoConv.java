@@ -4,12 +4,13 @@ public class NeoConv {
             System.out.println("Usage: neoconv [-i image.bmp] [-m map.tmx]");
             return;
         }
-
+        Converter converter = new Converter();
         for (int i = 0; i < args.length; i++) {
             if (args[i].equals("-i")) {
-                Converter converter = new Converter(args[i + 1]);
-                converter.writeImage(args[i + 1].substring(0, args[i + 1].indexOf('.')) + ".spr");
-                converter.writePalette(args[i + 1].substring(0, args[i + 1].indexOf('.')) + ".pal");
+                String imgStr = args[i+1];
+//                converter.writeImage(args[i + 1].substring(0, args[i + 1].indexOf('.')) + ".spr");
+                converter.addImage(imgStr);
+                converter.writePalette(imgStr, imgStr.substring(imgStr.lastIndexOf('\\') + 1, imgStr.lastIndexOf('.')) + ".pal");
                 i++;
             }
             else if (args[i].equals("-m")) {
@@ -20,5 +21,6 @@ public class NeoConv {
                 i++;
             }
         }
+        converter.writeImages("out.spr");
     }
 }

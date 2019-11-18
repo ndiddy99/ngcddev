@@ -37,7 +37,7 @@ INPUT_Z80 = $(SOURCE_Z80)/simple.asm
 INPUT_FIX = hello.fix
 
 # INPUT_SPR - filename of Sprite tile data file (4BPP SMS/GG/WSC format)
-INPUT_SPR = spr/HELLO.SPR
+INPUT_SPR = spr/out.spr
 
 ################################################################################
 # output paths and filenames #
@@ -48,7 +48,7 @@ OUTPUT_CD   = _cd
 OUTPUT_PRG_CD=$(OUTPUT_CD)/HELLO.PRG
 OUTPUT_FIX_CD=$(OUTPUT_CD)/HELLO.FIX
 OUTPUT_Z80_CD=$(OUTPUT_CD)/HELLO.Z80
-OUTPUT_SPR_CD=$(OUTPUT_CD)/HELLO.SPR
+OUTPUT_SPR_CD=$(OUTPUT_CD)/OUT.SPR
 OUTPUT_PCM_CD=$(OUTPUT_CD)/HELLO.PCM
 
 ################################################################################

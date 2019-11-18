@@ -112,7 +112,7 @@ VBlank:
 	; palette RAM updates.
 	;update RAM locations for joypad inputs
 	jsr SYSTEM_IO
-	
+	jsr bgUpdate
 	; move.w #1,LSPC_INCR
 	; move.w #SCB2+1,LSPC_ADDR
 	; moveq #9,d1 ;10 sprites - 1
@@ -274,38 +274,38 @@ CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 	
 Loop:
 	move.b BIOS_P1CURRENT,d0
-	btst.b #JOY_UP,d0
-	beq .NoUp
-		sub.w #1,spr_yPos
-	.NoUp:
-	btst.b #JOY_DOWN,d0
-	beq .NoDown
-		add.w #1,spr_yPos
-	.NoDown:
+	; btst.b #JOY_UP,d0
+	; beq .NoUp
+		; sub.w #1,bg1_yPos
+	; .NoUp:
+	; btst.b #JOY_DOWN,d0
+	; beq .NoDown
+		; add.w #1,bg1_yPos
+	; .NoDown:
 	btst.b #JOY_LEFT,d0
 	beq .NoLeft
-		sub.w #1,spr_xPos
+		add.w #1,bg1_xPos
 	.NoLeft:
 	btst.b #JOY_RIGHT,d0
 	beq .NoRight
-		add.w #1,spr_xPos
+		sub.w #1,bg1_xPos
 	.NoRight:
-	btst.b #JOY_A,d0
-	beq .NoA
-		sub.b #1,spr_xShrink
-	.NoA:
-	btst.b #JOY_B,d0
-	beq .NoB
-		add.b #1,spr_xShrink
-	.NoB:	
-	btst.b #JOY_C,d0
-	beq .NoC
-		sub.b #1,spr_yShrink
-	.NoC:	
-	btst.b #JOY_D,d0
-	beq .NoD
-		add.b #1,spr_yShrink
-	.NoD:
+	; btst.b #JOY_A,d0
+	; beq .NoA
+		; sub.b #1,spr_xShrink
+	; .NoA:
+	; btst.b #JOY_B,d0
+	; beq .NoB
+		; add.b #1,spr_xShrink
+	; .NoB:	
+	; btst.b #JOY_C,d0
+	; beq .NoC
+		; sub.b #1,spr_yShrink
+	; .NoC:	
+	; btst.b #JOY_D,d0
+	; beq .NoD
+		; add.b #1,spr_yShrink
+	; .NoD:
 	
 	add.w #$1,frame_count	
 	moveq #$4,d0

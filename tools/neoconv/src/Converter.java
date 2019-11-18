@@ -8,15 +8,48 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class Converter {
-    private ArrayList<Integer> palettes;
-    private int[] imageData;
-    private int imageWidth;
-    private int imageHeight;
-    private ArrayList<Tile> tiles;
+    private ArrayList<Byte> tiles;
 
-    public Converter(String imageFileName) {
-        File bmpFile = new File(imageFileName);
-        palettes = new ArrayList<>();
+    public Converter() {
+        tiles = new ArrayList<>();
+    }
+
+    public void addImage(String filename) {
+        File bmpFile = new File(filename);
+        try {
+            BufferedImage image = ImageIO.read(bmpFile);
+            int imageWidth = image.getWidth();
+            int imageHeight = image.getHeight();
+            int[] imageData = new int[imageWidth * imageHeight];
+            imageData = image.getData().getPixels(0, 0, imageWidth, imageHeight, imageData);
+            byte[] tileData = Tile.imageToByteArr(imageData, imageWidth, imageHeight);
+            for (int i = 0; i < tileData.length; i++) {
+                tiles.add(tileData[i]);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void writeImages(String filename) {
+        if (tiles.size() == 0) {
+            return;
+        }
+        Path path = Paths.get(filename);
+        byte[] tilesArr = new byte[tiles.size()];
+        for (int i = 0; i < tilesArr.length; i++) {
+            tilesArr[i] = tiles.get(i);
+        }
+        try {
+            Files.write(path, tilesArr);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void writePalette(String inFile, String outFile) {
+        File bmpFile = new File(inFile);
+        ArrayList<Integer> palettes = new ArrayList<>();
         try {
             BufferedImage image = ImageIO.read(bmpFile);
             IndexColorModel colorModel;
@@ -55,40 +88,36 @@ public class Converter {
                 System.out.println("palette: " + paletteEntry);
                 palettes.add(paletteEntry);
             }
-            //---get image data---
-            imageWidth = image.getWidth();
-            imageHeight = image.getHeight();
-            imageData = new int[imageWidth * imageHeight];
-            imageData = image.getData().getPixels(0, 0, imageWidth, imageHeight, imageData);
-            System.out.println(imageData.length);
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-    }
 
-    public void writeImage(String filename) {
-        Path path = Paths.get(filename);
-        byte[] tileData = Tile.imageToByteArr(imageData, imageWidth, imageHeight);
-        try {
-            Files.write(path, tileData);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    public void writePalette(String filename) {
         PrintWriter writer = null;
         try {
-            writer = new PrintWriter(filename, "UTF-8");
+            writer = new PrintWriter(outFile, "UTF-8");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-        writer.println(filename.substring(0, filename.indexOf('.')) + "Pal:");
-        writer.print("\tdc.w ");
-        for (int i = 0; i < palettes.size(); i++) {
-            writer.print(String.format("$%04X,", palettes.get(i)));
-
+        writer.print(outFile.substring(0, outFile.indexOf('.')) + "Pal:");
+        for (int i = 0; i < palettes.size(); i+= 8) {
+            //if a row is entirely zeroes, assume we've reached the end of a palette definition
+            boolean allZeroes = true;
+            for (int j = 0; j < 8; j++) {
+                if (palettes.get(i + j) != 0) {
+                    allZeroes = false;
+                    break;
+                }
+            }
+            if (allZeroes) {
+                writer.close();
+                return;
+            }
+            writer.print("\n\tdc.w ");
+            for (int j = 0; j < 8; j++) {
+                writer.print(String.format("$%04X,", palettes.get(i + j)));
+            }
         }
         writer.close();
 

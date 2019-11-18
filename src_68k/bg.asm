@@ -39,3 +39,20 @@ bgLoad:
 	
 	rts
 	
+;updates bg from variables (called in vblank)
+bgUpdate:
+	move.w #SCB3+1,LSPC_ADDR
+	; move.w bg1_yPos,d1
+	; move.w #496,d0
+	; sub.w d1,d0
+	; asl.w #7,d0
+	; or.w #14,d0
+	move.w #(496<<7)|14,LSPC_DATA
+	move.w d0,LSPC_DATA
+	move.w #SCB4+1,LSPC_ADDR
+	move.w bg1_xPos,d0
+	asl.w #7,d0
+	move.w d0,LSPC_DATA
+	rts
+
+	
