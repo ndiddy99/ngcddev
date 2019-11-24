@@ -13,3 +13,5 @@ spr_yShrink equ spr_xShrink+1;(byte)sprite y shrink
 ;bg.asm
 bg1_xPos equ spr_yShrink+1 ;(word)
 bg1_yPos equ bg1_xPos+2 ;word
+bg1_direction equ bg1_yPos+2 ;word
+bg1_copiedCol equ bg1_direction+2 ;word

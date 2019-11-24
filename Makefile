@@ -98,7 +98,7 @@ cd: cdfix cdprg cdz80 cdspr
 # -m68000 : compile for Motorola 68000 (and not anything higher)
 # -devpac : devpac compatibility mode (used to disable optimizations)
 # -Fbin   : set output format to binary
-FLAGS_VASM68K = -m68000 -devpac -Fbin
+FLAGS_VASM68K = -m68000 -devpac -Fbin -L out.lst
 
 #==============================================================================#
 # cdprg - cd program file

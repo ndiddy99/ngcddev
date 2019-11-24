@@ -14,7 +14,7 @@
 ;-- Neo-Geo Header --;
 	include "header_cd.inc" ; Neo-Geo CD systems header
 
-	include "tools\neoconv\map1.map" ;map data
+	include "tools\neoconv\map.map" ;map data
 
 	include "print.asm" ;print routines
 	include "sprite.asm" ;sprite copy routines
@@ -232,7 +232,7 @@ User_Main:
 	; jsr spriteLoad
 	
 	moveq #1,d0
-	lea map1,a0
+	lea map,a0
 	jsr bgLoad
 	
 	; ;set up shrink data in SCB2
@@ -273,7 +273,7 @@ CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 	
 	
 Loop:
-	move.b BIOS_P1CURRENT,d0
+	move.b BIOS_P1CURRENT,d1
 	; btst.b #JOY_UP,d0
 	; beq .NoUp
 		; sub.w #1,bg1_yPos
@@ -282,14 +282,16 @@ Loop:
 	; beq .NoDown
 		; add.w #1,bg1_yPos
 	; .NoDown:
-	btst.b #JOY_LEFT,d0
+	move.w bg1_xPos,d0
+	btst.b #JOY_LEFT,d1
 	beq .NoLeft
-		add.w #1,bg1_xPos
+		add.w #3,d0
 	.NoLeft:
-	btst.b #JOY_RIGHT,d0
+	btst.b #JOY_RIGHT,d1
 	beq .NoRight
-		sub.w #1,bg1_xPos
+		sub.w #3,d0
 	.NoRight:
+	jsr bgSet
 	; btst.b #JOY_A,d0
 	; beq .NoA
 		; sub.b #1,spr_xShrink
