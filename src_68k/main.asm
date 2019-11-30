@@ -14,10 +14,13 @@
 ;-- Neo-Geo Header --;
 	include "header_cd.inc" ; Neo-Geo CD systems header
 
-	include "tools\neoconv\map.map" ;map data
-
+	include "images\map.map" ;map data
+	
+	include "palettes.asm" ;palette data
+	
 	include "print.asm" ;print routines
 	include "sprite.asm" ;sprite copy routines
+	include "player.asm" ;player stuff
 	include "bg.asm" ;bg simulation routines
 	
 ;******************************************************************************;
@@ -113,6 +116,7 @@ VBlank:
 	;update RAM locations for joypad inputs
 	jsr SYSTEM_IO
 	jsr bgUpdate
+	jsr playerSet
 	; move.w #1,LSPC_INCR
 	; move.w #SCB2+1,LSPC_ADDR
 	; moveq #9,d1 ;10 sprites - 1
@@ -217,50 +221,21 @@ User_Main:
 	move.b #$ff,spr_yShrink ;y shrink is 8 bits
 	
 	moveq #$1,d0 ;write to palette 1
-	lea WeebPalette,a0
+	lea bgPal,a0
+	jsr LoadPalette
+	
+	moveq #$2,d0
+	lea guyPal,a0
 	jsr LoadPalette
 	
 	;tell MESS_OUT we're busy messing with the data, so don't run.
 	bset.b	#0,BIOS_MESS_BUSY
 	
-	; ;set up tiles in SCB1
-	; moveq #1,d0 ;sprite #1
-	; moveq #0,d1 ;tile #0
-	; moveq #10,d2 ;sprite is 10 tiles wide
-	; moveq #7,d3 ;sprite is 7 tiles tall
-	; move.w #$100,d4 ;palette 1, no special attributes
-	; jsr spriteLoad
-	
 	moveq #1,d0
 	lea map,a0
 	jsr bgLoad
 	
-	; ;set up shrink data in SCB2
-	; move.w #SCB2+2,LSPC_ADDR
-	; moveq #9,d1
-	; .copySCB2:
-		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-		; dbra d1,.copySCB2
-	
-	; ;set up y position data in SCB3
-	; move.w #SCB3+1,LSPC_ADDR
-	; move.w spr_yPos,d0
-	; move.w #496,d1
-	; sub.w d0,d1
-	; asl.w #7,d1
-	; or.w #7,d1 ;sprite is 7 tiles high
-	; move.w d1,LSPC_DATA
-	
-	; move.w #8,d0 ;sticky bits for remaining 9 sprites
-	; .copySCB3:
-		; move.w #$40,LSPC_DATA
-		; dbra d0,.copySCB3
-	
-	;sprite 1's x position in SCB4
-	; move.w #SCB4+1,LSPC_ADDR
-	; move.w spr_xPos,d0
-	; asl.w #7,d0
-	; move.w d0,LSPC_DATA ;x pos
+	jsr playerInit
 	
 	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
 	
@@ -273,42 +248,7 @@ CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 	
 	
 Loop:
-	move.b BIOS_P1CURRENT,d1
-	; btst.b #JOY_UP,d0
-	; beq .NoUp
-		; sub.w #1,bg1_yPos
-	; .NoUp:
-	; btst.b #JOY_DOWN,d0
-	; beq .NoDown
-		; add.w #1,bg1_yPos
-	; .NoDown:
-	move.w bg1_xPos,d0
-	btst.b #JOY_LEFT,d1
-	beq .NoLeft
-		add.w #3,d0
-	.NoLeft:
-	btst.b #JOY_RIGHT,d1
-	beq .NoRight
-		sub.w #3,d0
-	.NoRight:
-	jsr bgSet
-	; btst.b #JOY_A,d0
-	; beq .NoA
-		; sub.b #1,spr_xShrink
-	; .NoA:
-	; btst.b #JOY_B,d0
-	; beq .NoB
-		; add.b #1,spr_xShrink
-	; .NoB:	
-	; btst.b #JOY_C,d0
-	; beq .NoC
-		; sub.b #1,spr_yShrink
-	; .NoC:	
-	; btst.b #JOY_D,d0
-	; beq .NoD
-		; add.b #1,spr_yShrink
-	; .NoD:
-	
+	jsr playerMove
 	add.w #$1,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
@@ -325,9 +265,6 @@ Loop:
 	jmp Loop
 
 str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
-
-WeebPalette:
-	dc.w $B423,$3744,$0855,$7A65,$A869,$3C88,$4CA9,$4CBC,$0FB9,$0FDB,$1FDC,$2FED,$0FEF,$5FFF,$6FFF,$FFFF
 
 ;copies palette into palette ram
 ;d0- palette number to copy to (long)

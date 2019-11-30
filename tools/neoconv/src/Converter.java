@@ -100,7 +100,7 @@ public class Converter {
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-        writer.print(outFile.substring(0, outFile.indexOf('.')) + "Pal:");
+        writer.print(outFile.substring(outFile.lastIndexOf('/') + 1, outFile.indexOf('.')) + "Pal:");
         for (int i = 0; i < palettes.size(); i+= 8) {
             //if a row is entirely zeroes, assume we've reached the end of a palette definition
             boolean allZeroes = true;
@@ -116,7 +116,12 @@ public class Converter {
             }
             writer.print("\n\tdc.w ");
             for (int j = 0; j < 8; j++) {
-                writer.print(String.format("$%04X,", palettes.get(i + j)));
+                if (j == 7) {
+                    writer.print(String.format("$%04X", palettes.get(i + j)));
+                }
+                else {
+                    writer.print(String.format("$%04X,", palettes.get(i + j)));
+                }
             }
         }
         writer.close();

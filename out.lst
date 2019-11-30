@@ -611,6 +611,11 @@ F03:0015       bg1_yPos equ bg1_xPos+2 ;word
 F03:0016       bg1_direction equ bg1_yPos+2 ;word
 F03:0017       bg1_copiedCol equ bg1_direction+2 ;word
 F03:0018       
+F03:0019       ;player.asm
+F03:0020       player_xPos equ bg1_copiedCol+2 ;long
+F03:0021       player_yPos equ player_xPos+4 ;long
+F03:0022       player_xSpeed equ player_yPos+4 ;long
+F03:0023       player_ySpeed equ player_xSpeed+4 ;long
 F00:0009       	
 F00:0010       ;==============================================================================;
 F00:0011       ;-- 68000 header --;
@@ -684,16 +689,16 @@ F04:0041
 F04:0042       ; Interrupts
 F04:0043       	ifd		TARGET_CD		; (Interrupt levels 1 and 2 are swapped on CD systems.)
 F04:0044       		dc.l	IRQ2		; Level 2 interrupt (HBlank)
-               S01:00000064:  00 00 25 B6 [R]
+               S01:00000064:  00 00 26 F0 [R]
 F04:0045       		dc.l	VBlank		; Level 1 interrupt (VBlank)
-               S01:00000068:  00 00 25 7A [R]
+               S01:00000068:  00 00 26 AE [R]
 F04:0046       	else
 F04:0047       		dc.l	VBlank		; Level 1 interrupt (VBlank)
 F04:0048       		dc.l	IRQ2		; Level 2 interrupt (HBlank)
 F04:0049       	endif
 F04:0050       
 F04:0051       	dc.l	IRQ3			; Level 3 interrupt
-               S01:0000006C:  00 00 25 C6 [R]
+               S01:0000006C:  00 00 27 00 [R]
 F04:0052       	dc.l	$00000000		; Level 4 interrupt
                S01:00000070:  00 00 00 00
 F04:0053       	dc.l	$00000000		; Level 5 interrupt
@@ -809,13 +814,13 @@ F05:0023       	dc.l softDips_Europe	; Software dips for Europe
                S01:0000011E:  00 00 02 88 [R]
 F05:0024       
 F05:0025       	jmp USER			; $122
-               S01:00000122:  4E F9 00 00 25 28 [R]
+               S01:00000122:  4E F9 00 00 26 5C [R]
 F05:0026       	jmp PLAYER_START	; $128
-               S01:00000128:  4E F9 00 00 25 74 [R]
+               S01:00000128:  4E F9 00 00 26 A8 [R]
 F05:0027       	jmp DEMO_END		; $12E
-               S01:0000012E:  4E F9 00 00 25 76 [R]
+               S01:0000012E:  4E F9 00 00 26 AA [R]
 F05:0028       	jmp COIN_SOUND		; $134
-               S01:00000134:  4E F9 00 00 25 78 [R]
+               S01:00000134:  4E F9 00 00 26 AC [R]
 F05:0029       
 F05:0030       	dc.w $FFFF			; $13A: Z80 RAM address for CDDA commands (set to FFFF for default FEF8)
                S01:0000013A:  FF FF
@@ -993,7 +998,7 @@ F07:0041       	dc.b	"CHOICE2 E   "
 F07:0042       
 F05:0044       
 F00:0016       
-F00:0017       	include "tools\neoconv\map.map" ;map data
+F00:0017       	include "images\map.map" ;map data
 F08:0001       map:
 F08:0002       	dc.w $0000,$0100
                S01:000002CC:  00 00
@@ -7140,848 +7145,904 @@ F08:2049       	dc.w $0000,$0100
                S01:000022C8:  00 00
                S01:000022CA:  01 00
 F08:2050       
-F00:0018       
-F00:0019       	include "print.asm" ;print routines
-F09:0001       FIX_ADDR equ $7022 ;top/left of FIX area screen
-F09:0002       LO_NYBBLE_MASK equ $0F
-F09:0003       HI_NYBBLE_MASK equ $F0
-F09:0004       ASCII_BASE equ $30 ;what to add to numbers from 0-9 to get equivalent ascii value
-F09:0005       ASCII_A_BASE equ $37 ;what to add to numbers from a-f
-F09:0006       
-F09:0007       ; fix_PrintString
-F09:0008       ; Prints a string on the Fix layer.
-F09:0009       
-F09:0010       ; (Params)
-F09:0011       ; d0 - [word] Fix layer X position
-F09:0012       ; d1 - [word] Fix layer y position
-F09:0013       ; d2 - [byte] Palette number and page number
-F09:0014       ; a0 - [long] Pointer to string to write
-F09:0015       
-F09:0016       fix_PrintString:
-F09:0017       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
-               S01:000022CC:  33 FC 00 20 00 3C 00 04
-F09:0018       	asl.w #$5,d0 ;x position on FIX layer increments by $20
-               S01:000022D4:  EB 40
-F09:0019       	add.w d1,d0 ;y position on FIX layer increments by 1
-               S01:000022D6:  D0 41
-F09:0020       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
-               S01:000022D8:  D0 7C 70 22
-F09:0021       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
-               S01:000022DC:  33 C0 00 3C 00 00
-F09:0022       	moveq #0,d0 ; clear d0 so we can use it in the loop without issue.
-               S01:000022E2:  70 00
-F09:0023       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
-               S01:000022E4:  E1 42
-F09:0024       
-F09:0025       .fix_PrintString_Loop:
-F09:0026       	move.b (a0)+,d0 ; get character from string and increment pointer position
-               S01:000022E6:  10 18
-F09:0027       	cmpi.b #$FF,d0 ; check if this character is $FF (the terminator)
-               S01:000022E8:  0C 00 00 FF
-F09:0028       	beq.s .fix_PrintString_End ; if so, we're done with the string; exit the routine.
-               S01:000022EC:  67 0A
-F09:0029       
-F09:0030       	; normal execution:
-F09:0031       	or.w d2,d0 ; OR with the palette and page number
-               S01:000022EE:  80 42
-F09:0032       	move.w d0,LSPC_DATA ; write tile to fix layer
-               S01:000022F0:  33 C0 00 3C 00 02
-F09:0033       	bra.s .fix_PrintString_Loop ; loop back for another character
-               S01:000022F6:  60 EE
-F09:0034       
-F09:0035       .fix_PrintString_End:
-F09:0036       	rts
-               S01:000022F8:  4E 75
-F09:0037       
-F09:0038       ; fix_PrintHexByte
-F09:0039       ; Prints a byte on the Fix layer.
-F09:0040       
-F09:0041       ; (Params)
-F09:0042       ; d0 - [word] Fix layer X position
-F09:0043       ; d1 - [word] Fix layer y position
-F09:0044       ; d2 - [byte] Palette number and page number
-F09:0045       ; a0 - [long] Pointer to byte to print
-F09:0046       
-F09:0047       fix_PrintHexByte:
-F09:0048       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
-               S01:000022FA:  33 FC 00 20 00 3C 00 04
-F09:0049       	asl.w #$5,d0 ;x position on FIX layer increments by $20
-               S01:00002302:  EB 40
-F09:0050       	add.w d1,d0 ;y position on FIX layer increments by 1
-               S01:00002304:  D0 41
-F09:0051       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
-               S01:00002306:  D0 7C 70 22
-F09:0052       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
-               S01:0000230A:  33 C0 00 3C 00 00
-F09:0053       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
-               S01:00002310:  E1 42
-F09:0054       	moveq #$0,d0 ;clear d0
+F00:0018       	
+F00:0019       	include "palettes.asm" ;palette data
+F09:0001       ;palette defs
+F09:0002       	include "images\bg.pal"
+F10:0001       bgPal:
+F10:0002       	dc.w $0000,$4F00,$0000,$0000,$0000,$0000,$0000,$0000
+               S01:000022CC:  00 00
+               S01:000022CE:  4F 00
+               S01:000022D0:  00 00
+               S01:000022D2:  00 00
+               S01:000022D4:  00 00
+               S01:000022D6:  00 00
+               S01:000022D8:  00 00
+               S01:000022DA:  00 00
+F09:0003       	include "images\guy.pal"
+F11:0001       guyPal:
+F11:0002       	dc.w $0000,$2633,$9396,$5EC9,$5853,$E337,$6532,$7224
+               S01:000022DC:  00 00
+               S01:000022DE:  26 33
+               S01:000022E0:  93 96
+               S01:000022E2:  5E C9
+               S01:000022E4:  58 53
+               S01:000022E6:  E3 37
+               S01:000022E8:  65 32
+               S01:000022EA:  72 24
+F11:0003       	dc.w $04B8,$0000,$0000,$0000,$0000,$0000,$0000,$0000
+               S01:000022EC:  04 B8
+               S01:000022EE:  00 00
+               S01:000022F0:  00 00
+               S01:000022F2:  00 00
+               S01:000022F4:  00 00
+               S01:000022F6:  00 00
+               S01:000022F8:  00 00
+               S01:000022FA:  00 00
+F00:0020       	
+F00:0021       	include "print.asm" ;print routines
+F12:0001       FIX_ADDR equ $7022 ;top/left of FIX area screen
+F12:0002       LO_NYBBLE_MASK equ $0F
+F12:0003       HI_NYBBLE_MASK equ $F0
+F12:0004       ASCII_BASE equ $30 ;what to add to numbers from 0-9 to get equivalent ascii value
+F12:0005       ASCII_A_BASE equ $37 ;what to add to numbers from a-f
+F12:0006       
+F12:0007       ; fix_PrintString
+F12:0008       ; Prints a string on the Fix layer.
+F12:0009       
+F12:0010       ; (Params)
+F12:0011       ; d0 - [word] Fix layer X position
+F12:0012       ; d1 - [word] Fix layer y position
+F12:0013       ; d2 - [byte] Palette number and page number
+F12:0014       ; a0 - [long] Pointer to string to write
+F12:0015       
+F12:0016       fix_PrintString:
+F12:0017       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
+               S01:000022FC:  33 FC 00 20 00 3C 00 04
+F12:0018       	asl.w #$5,d0 ;x position on FIX layer increments by $20
+               S01:00002304:  EB 40
+F12:0019       	add.w d1,d0 ;y position on FIX layer increments by 1
+               S01:00002306:  D0 41
+F12:0020       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
+               S01:00002308:  D0 7C 70 22
+F12:0021       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
+               S01:0000230C:  33 C0 00 3C 00 00
+F12:0022       	moveq #0,d0 ; clear d0 so we can use it in the loop without issue.
                S01:00002312:  70 00
-F09:0055       	move.b (a0),d1 ;load byte to print from ram
-               S01:00002314:  12 10
-F09:0056       	;print high nybble
-F09:0057       	move.b d1,d0
-               S01:00002316:  10 01
-F09:0058       	lsr.b #$4,d0 ;isolate high nybble
-               S01:00002318:  E8 08
-F09:0059       	jsr printNybble
-               S01:0000231A:  4E B9 00 00 23 7A [R]
-F09:0060       	;print low nybble
-F09:0061       	move.b d1,d0
-               S01:00002320:  10 01
-F09:0062       	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble
-               S01:00002322:  C0 3C 00 0F
-F09:0063       	jmp printNybble ;jmp instead of jsr because of tail call
-               S01:00002326:  4E F9 00 00 23 7A [R]
-F09:0064       
-F09:0065       ; fix_PrintHexWord
-F09:0066       ; Prints a word on the Fix layer.
-F09:0067       
-F09:0068       ; (Params)
-F09:0069       ; d0 - [word] Fix layer X position
-F09:0070       ; d1 - [word] Fix layer y position
-F09:0071       ; d2 - [byte] Palette number and page number
-F09:0072       ; a0 - [long] Pointer to word to print	
-F09:0073       fix_PrintHexWord:
-F09:0074       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
-               S01:0000232C:  33 FC 00 20 00 3C 00 04
-F09:0075       	asl.w #$5,d0 ;x position on FIX layer increments by $20
-               S01:00002334:  EB 40
-F09:0076       	add.w d1,d0 ;y position on FIX layer increments by 1
-               S01:00002336:  D0 41
-F09:0077       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
-               S01:00002338:  D0 7C 70 22
-F09:0078       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
-               S01:0000233C:  33 C0 00 3C 00 00
-F09:0079       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
-               S01:00002342:  E1 42
-F09:0080       	moveq #$0,d0 ;clear d0
-               S01:00002344:  70 00
-F09:0081       	move.w (a0),d1 ;load word to print from ram
-               S01:00002346:  32 10
-F09:0082       	;print high nybble
-F09:0083       	move.w d1,d0
-               S01:00002348:  30 01
-F09:0084       	rol.w #4,d0 ;isolate high nybble of high word
-               S01:0000234A:  E9 58
-F09:0085       	and.w #LO_NYBBLE_MASK,d0
-               S01:0000234C:  C0 7C 00 0F
-F09:0086       	jsr printNybble
-               S01:00002350:  4E B9 00 00 23 7A [R]
-F09:0087       	;print low nybble
-F09:0088       	move.w d1,d0
-               S01:00002356:  30 01
-F09:0089       	lsr.w #8,d0 ;isolate low nybble of high word
-               S01:00002358:  E0 48
-F09:0090       	and.w #LO_NYBBLE_MASK,d0
-               S01:0000235A:  C0 7C 00 0F
-F09:0091       	jsr printNybble
-               S01:0000235E:  4E B9 00 00 23 7A [R]
-F09:0092       	;print high nybble
-F09:0093       	move.b d1,d0
-               S01:00002364:  10 01
-F09:0094       	lsr.b #4,d0 ;isolate high nybble of low word
-               S01:00002366:  E8 08
-F09:0095       	jsr printNybble
-               S01:00002368:  4E B9 00 00 23 7A [R]
-F09:0096       	;print low nybble
-F09:0097       	move.b d1,d0
-               S01:0000236E:  10 01
-F09:0098       	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble of high word
-               S01:00002370:  C0 3C 00 0F
-F09:0099       	jmp printNybble ;jmp instead of jsr because of tail call
-               S01:00002374:  4E F9 00 00 23 7A [R]
-F09:0100       
-F09:0101       ;utility function for other prints, don't call directly. needs LSPC_ADDR
-F09:0102       ;to be set already
-F09:0103       ;d0 - data to print
-F09:0104       ;d2 - palette/page number
-F09:0105       printNybble:
-F09:0106       	cmp.b #$A,d0 
-               S01:0000237A:  B0 3C 00 0A
-F09:0107       	bcs .9orLess
-               S01:0000237E:  65 00 00 0C
-F09:0108       		add.b #ASCII_A_BASE,d0
-               S01:00002382:  D0 3C 00 37
-F09:0109       		jmp .doneAdd
-               S01:00002386:  4E F9 00 00 23 90 [R]
-F09:0110       	.9orLess:
-F09:0111       		add.b #ASCII_BASE,d0
-               S01:0000238C:  D0 3C 00 30
-F09:0112       	.doneAdd:
-F09:0113       	or.w d2,d0 ; OR with the palette and page number
-               S01:00002390:  80 42
-F09:0114       	move.w d0,LSPC_DATA ; write tile to fix layer
-               S01:00002392:  33 C0 00 3C 00 02
-F09:0115       	rts
-               S01:00002398:  4E 75
-F09:0116       
-F00:0020       	include "sprite.asm" ;sprite copy routines
-F10:0001       
-F10:0002       ;load a sprite's tiles linearly into vram
-F10:0003       ;d0 - sprite to start with
-F10:0004       ;d1 - tile # to start with
-F10:0005       ;d2 - sprite width
-F10:0006       ;d3 - sprite height
-F10:0007       ;d4 - sprite attributes
-F10:0008       spriteLoad:
-F10:0009       	move.w #1,LSPC_INCR
-               S01:0000239A:  33 FC 00 01 00 3C 00 04
-F10:0010       	asl.w #6,d0 ;sprites are 64 words apart
-               S01:000023A2:  ED 40
-F10:0011       	; add.w #SCB1,d0 ;initial offset (scb1 is 0)
-F10:0012       	move.w d2,d5 ;loop counter:#rows
-               S01:000023A4:  3A 02
-F10:0013       	sub.w #1,d5;make work with dbra
-               S01:000023A6:  9A 7C 00 01
-F10:0014       .copyRow:
-F10:0015       	move.w d1,d6 ;tile num to d5
-               S01:000023AA:  3C 01
-F10:0016       	move.w d0,LSPC_ADDR
-               S01:000023AC:  33 C0 00 3C 00 00
-F10:0017       	move.w d3,d7 ;loop counter:#cols
-               S01:000023B2:  3E 03
-F10:0018       	sub.w #1,d7
-               S01:000023B4:  9E 7C 00 01
-F10:0019       	.copyCol:
-F10:0020       		move.w d6,LSPC_DATA
-               S01:000023B8:  33 C6 00 3C 00 02
-F10:0021       		move.w d4,LSPC_DATA
-               S01:000023BE:  33 C4 00 3C 00 02
-F10:0022       		add.w d2,d6 ;move to next row in the sprite
-               S01:000023C4:  DC 42
-F10:0023       		dbra d7,.copyCol
-               S01:000023C6:  51 CF FF F0
-F10:0024       	add.w #64,d0 ;each sprite is 64 words
-               S01:000023CA:  D0 7C 00 40
-F10:0025       	add.w #1,d1 ;move to next column
-               S01:000023CE:  D2 7C 00 01
-F10:0026       	dbra d5,.copyRow
-               S01:000023D2:  51 CD FF D6
-F10:0027       	rts
-               S01:000023D6:  4E 75
-F10:0028       	
-F00:0021       	include "bg.asm" ;bg simulation routines
-F11:0001       ;background display routines
-F11:0002       SCREEN_COLS equ 20
-F11:0003       LEFT_FLAG equ 1
-F11:0004       RIGHT_FLAG equ 2
-F11:0005       
-F11:0006       ;loads background into 32x16 block
-F11:0007       ;a0: pointer to map data
-F11:0008       ;d0: which sprite # to load the bg at
-F11:0009       bgLoad:
-F11:0010       	move.w #1,LSPC_INCR
-               S01:000023D8:  33 FC 00 01 00 3C 00 04
-F11:0011       	asl.w #6,d0 ;d0 *= 64
-               S01:000023E0:  ED 40
-F11:0012       	; add.w #SCB1,d0 ;scb0's address is 0 so this is unnecessary
-F11:0013       	moveq #31,d1 ;#cols - 1
-               S01:000023E2:  72 1F
-F11:0014       .copyRow:
-F11:0015       	move.w d0,LSPC_ADDR
-               S01:000023E4:  33 C0 00 3C 00 00
-F11:0016       	moveq #15,d2 ;#rows - 1
-               S01:000023EA:  74 0F
-F11:0017       	.copyCol:
-F11:0018       		move.w (a0)+,LSPC_DATA ;tile
-               S01:000023EC:  33 D8 00 3C 00 02
-F11:0019       		move.w (a0)+,LSPC_DATA ;palette
-               S01:000023F2:  33 D8 00 3C 00 02
-F11:0020       		dbra d2,.copyCol
-               S01:000023F8:  51 CA FF F2
-F11:0021       	add.w #64,d0
-               S01:000023FC:  D0 7C 00 40
-F11:0022       	dbra d1,.copyRow
-               S01:00002400:  51 C9 FF E2
-F11:0023       	
-F11:0024       	;no shrink
-F11:0025       	move.w #SCB2+1,LSPC_ADDR
-               S01:00002404:  33 FC 80 01 00 3C 00 00
-F11:0026       	moveq #31,d1
-               S01:0000240C:  72 1F
-F11:0027       .copyShrink:
-F11:0028       	move.w #$0FFF,LSPC_DATA ;no shrink
-               S01:0000240E:  33 FC 0F FF 00 3C 00 02
-F11:0029       	dbra d1,.copyShrink
-               S01:00002416:  51 C9 FF F6
-F11:0030       	
-F11:0031       	;y pos = 0
-F11:0032       	move.w #SCB3+1,LSPC_ADDR
-               S01:0000241A:  33 FC 82 01 00 3C 00 00
-F11:0033       	move.w #(496<<7)|16,LSPC_DATA ;496=0 y pos on neo geo, sprite is 16 tiles high
-               S01:00002422:  33 FC F8 10 00 3C 00 02
-F11:0034       	moveq #30,d1
-               S01:0000242A:  72 1E
-F11:0035       .copySticky:
-F11:0036       	move.w #$40,LSPC_DATA
-               S01:0000242C:  33 FC 00 40 00 3C 00 02
-F11:0037       	dbra d1,.copySticky
-               S01:00002434:  51 C9 FF F6
-F11:0038       	
-F11:0039       	;x pos = 0
-F11:0040       	move.w #SCB4+1,LSPC_ADDR
-               S01:00002438:  33 FC 84 01 00 3C 00 00
-F11:0041       	move.w #0,LSPC_DATA
-               S01:00002440:  33 FC 00 00 00 3C 00 02
-F11:0042       	
-F11:0043       	rts
-               S01:00002448:  4E 75
-F11:0044       	
-F11:0045       ;updates bg from variables (called in vblank)
-F11:0046       bgUpdate:
-F11:0047       	move.w #SCB3+1,LSPC_ADDR
-               S01:0000244A:  33 FC 82 01 00 3C 00 00
-F11:0048       	move.w #(496<<7)|16,LSPC_DATA
-               S01:00002452:  33 FC F8 10 00 3C 00 02
-F11:0049       	move.w #SCB4+1,LSPC_ADDR
-               S01:0000245A:  33 FC 84 01 00 3C 00 00
-F11:0050       	move.w bg1_xPos,d0
-               S01:00002462:  30 39 00 10 00 0A
-F11:0051       	neg.w d0 ;transform from "distance from start of map" to "distance leftmost sprite has gone
-               S01:00002468:  44 40
-F11:0052       	asl.w #7,d0 ;offscreen"
-               S01:0000246A:  EF 40
-F11:0053       	move.w d0,LSPC_DATA
-               S01:0000246C:  33 C0 00 3C 00 02
-F11:0054       	
-F11:0055       	moveq #0,d0 ;clear all of d0
-               S01:00002472:  70 00
-F11:0056       	move.w bg1_xPos,d0
-               S01:00002474:  30 39 00 10 00 0A
-F11:0057       	lsr.w #4,d0
-               S01:0000247A:  E8 48
-F11:0058       	cmp.w bg1_copiedCol,d0
-               S01:0000247C:  B0 79 00 10 00 10
-F11:0059       	beq .noTileBoundary
-               S01:00002482:  67 00 00 46
-F11:0060       	blo .scrollingR
-               S01:00002486:  65 00 00 22
-F11:0061       	.scrollingL: ;scroling left so copy more columns to the right
-F11:0062       		move.w d0,bg1_copiedCol
-               S01:0000248A:  33 C0 00 10 00 10
-F11:0063       		add.w #SCREEN_COLS+1,d0 ;get first offscreen column
-               S01:00002490:  D0 7C 00 15
-F11:0064       		move.w d0,d1
-               S01:00002494:  32 00
-F11:0065       		and.w #31,d1
-               S01:00002496:  C2 7C 00 1F
-F11:0066       		add.w #1,d1 ;we start from sprite 1, not sprite 0
-               S01:0000249A:  D2 7C 00 01
-F11:0067       		lea map,a0
-               S01:0000249E:  41 F9 00 00 02 CC [R]
-F11:0068       		jmp copyCol ;not jsr because of tail-call
-               S01:000024A4:  4E F9 00 00 25 00 [R]
-F11:0069       	.scrollingR: ;scrolling right so copy more columns to the left
-F11:0070       		move.w d0,bg1_copiedCol
-               S01:000024AA:  33 C0 00 10 00 10
-F11:0071       		sub #1,d0 ;get first offscreen column
-               S01:000024B0:  90 7C 00 01
-F11:0072       		move.w d0,d1
-               S01:000024B4:  32 00
-F11:0073       		and.w #31,d1
-               S01:000024B6:  C2 7C 00 1F
-F11:0074       		add.w #1,d1 ;we start from sprite 1, not sprite 0
-               S01:000024BA:  D2 7C 00 01
-F11:0075       		lea map,a0
-               S01:000024BE:  41 F9 00 00 02 CC [R]
-F11:0076       		jmp copyCol ;not jsr because of tail-call	
-               S01:000024C4:  4E F9 00 00 25 00 [R]
-F11:0077       .noTileBoundary:
-F11:0078       	rts
-               S01:000024CA:  4E 75
-F11:0079       	
-F11:0080       ;sets background position
-F11:0081       ;d0- bg x position
-F11:0082       bgSet:
-F11:0083       	cmp.w bg1_xPos,d0
-               S01:000024CC:  B0 79 00 10 00 0A
-F11:0084       	blo .scrollingL
-               S01:000024D2:  65 00 00 10
-F11:0085       	bhi .scrollingR
-               S01:000024D6:  62 00 00 18
-F11:0086       	clr.w bg1_direction ;not scrolling either way
-               S01:000024DA:  42 79 00 10 00 0E
-F11:0087       	bra .doneTests
-               S01:000024E0:  60 00 00 16
-F11:0088       .scrollingL:
-F11:0089       	move.w #LEFT_FLAG,bg1_direction
-               S01:000024E4:  33 FC 00 01 00 10 00 0E
-F11:0090       	bra .doneTests
-               S01:000024EC:  60 00 00 0A
-F11:0091       .scrollingR:
-F11:0092       	move.w #RIGHT_FLAG,bg1_direction
-               S01:000024F0:  33 FC 00 02 00 10 00 0E
-F11:0093       .doneTests:
-F11:0094       	move.w d0,bg1_xPos
-               S01:000024F8:  33 C0 00 10 00 0A
-F11:0095       	rts
-               S01:000024FE:  4E 75
-F11:0096       
-F11:0097       ;d0: column number to copy from map (long)
-F11:0098       ;d1: sprite to copy it to (word)
-F11:0099       ;a0: map pointer
-F11:0100       copyCol:
-F11:0101       	move.w #1,LSPC_INCR
-               S01:00002500:  33 FC 00 01 00 3C 00 04
-F11:0102       	asl.w #6,d1
-               S01:00002508:  ED 41
-F11:0103       	move.w d1,LSPC_ADDR
-               S01:0000250A:  33 C1 00 3C 00 00
-F11:0104       	asl.l #6,d0 ;each column is 16 tiles, 2 words per tile, 2 bytes per word
-               S01:00002510:  ED 80
-F11:0105       	add.l d0,a0
-               S01:00002512:  D1 C0
-F11:0106       	moveq #15,d0 ;num tiles - 1
-               S01:00002514:  70 0F
-F11:0107       .copyLoop:
-F11:0108       	move.w (a0)+,LSPC_DATA
-               S01:00002516:  33 D8 00 3C 00 02
-F11:0109       	move.w (a0)+,LSPC_DATA
-               S01:0000251C:  33 D8 00 3C 00 02
-F11:0110       	dbra d0,.copyLoop
-               S01:00002522:  51 C8 FF F2
-F11:0111       	rts
-               S01:00002526:  4E 75
-F11:0112       	
-F11:0113       	
-F00:0022       	
-F00:0023       ;******************************************************************************;
-F00:0024       ; == The required routines == ;
-F00:0025       ;******************************************************************************;
-F00:0026       ; These four routines are defined in the system header.
-F00:0027       ; They *require* being jmp'd to, so watch out if you're enabling optimizations.
-F00:0028       ; (This is why devpac compatibility mode is enabled in the build process, as
-F00:0029       ; it disables optimizations by default.)
-F00:0030       
-F00:0031       ;==============================================================================;
-F00:0032       ; USER
-F00:0033       ; Respond to the system ROM's request (BIOS_USER_REQUEST).
+F12:0023       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
+               S01:00002314:  E1 42
+F12:0024       
+F12:0025       .fix_PrintString_Loop:
+F12:0026       	move.b (a0)+,d0 ; get character from string and increment pointer position
+               S01:00002316:  10 18
+F12:0027       	cmpi.b #$FF,d0 ; check if this character is $FF (the terminator)
+               S01:00002318:  0C 00 00 FF
+F12:0028       	beq.s .fix_PrintString_End ; if so, we're done with the string; exit the routine.
+               S01:0000231C:  67 0A
+F12:0029       
+F12:0030       	; normal execution:
+F12:0031       	or.w d2,d0 ; OR with the palette and page number
+               S01:0000231E:  80 42
+F12:0032       	move.w d0,LSPC_DATA ; write tile to fix layer
+               S01:00002320:  33 C0 00 3C 00 02
+F12:0033       	bra.s .fix_PrintString_Loop ; loop back for another character
+               S01:00002326:  60 EE
+F12:0034       
+F12:0035       .fix_PrintString_End:
+F12:0036       	rts
+               S01:00002328:  4E 75
+F12:0037       
+F12:0038       ; fix_PrintHexByte
+F12:0039       ; Prints a byte on the Fix layer.
+F12:0040       
+F12:0041       ; (Params)
+F12:0042       ; d0 - [word] Fix layer X position
+F12:0043       ; d1 - [word] Fix layer y position
+F12:0044       ; d2 - [byte] Palette number and page number
+F12:0045       ; a0 - [long] Pointer to byte to print
+F12:0046       
+F12:0047       fix_PrintHexByte:
+F12:0048       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
+               S01:0000232A:  33 FC 00 20 00 3C 00 04
+F12:0049       	asl.w #$5,d0 ;x position on FIX layer increments by $20
+               S01:00002332:  EB 40
+F12:0050       	add.w d1,d0 ;y position on FIX layer increments by 1
+               S01:00002334:  D0 41
+F12:0051       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
+               S01:00002336:  D0 7C 70 22
+F12:0052       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
+               S01:0000233A:  33 C0 00 3C 00 00
+F12:0053       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
+               S01:00002340:  E1 42
+F12:0054       	moveq #$0,d0 ;clear d0
+               S01:00002342:  70 00
+F12:0055       	move.b (a0),d1 ;load byte to print from ram
+               S01:00002344:  12 10
+F12:0056       	;print high nybble
+F12:0057       	move.b d1,d0
+               S01:00002346:  10 01
+F12:0058       	lsr.b #$4,d0 ;isolate high nybble
+               S01:00002348:  E8 08
+F12:0059       	jsr printNybble
+               S01:0000234A:  4E B9 00 00 23 AA [R]
+F12:0060       	;print low nybble
+F12:0061       	move.b d1,d0
+               S01:00002350:  10 01
+F12:0062       	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble
+               S01:00002352:  C0 3C 00 0F
+F12:0063       	jmp printNybble ;jmp instead of jsr because of tail call
+               S01:00002356:  4E F9 00 00 23 AA [R]
+F12:0064       
+F12:0065       ; fix_PrintHexWord
+F12:0066       ; Prints a word on the Fix layer.
+F12:0067       
+F12:0068       ; (Params)
+F12:0069       ; d0 - [word] Fix layer X position
+F12:0070       ; d1 - [word] Fix layer y position
+F12:0071       ; d2 - [byte] Palette number and page number
+F12:0072       ; a0 - [long] Pointer to word to print	
+F12:0073       fix_PrintHexWord:
+F12:0074       	move.w #$20,LSPC_INCR ; set LSPC increment to $20/32 (horizontal writing)
+               S01:0000235C:  33 FC 00 20 00 3C 00 04
+F12:0075       	asl.w #$5,d0 ;x position on FIX layer increments by $20
+               S01:00002364:  EB 40
+F12:0076       	add.w d1,d0 ;y position on FIX layer increments by 1
+               S01:00002366:  D0 41
+F12:0077       	add.w #FIX_ADDR,d0 ;calculate offset from start of FIX
+               S01:00002368:  D0 7C 70 22
+F12:0078       	move.w d0,LSPC_ADDR ; set up LSPC address from param in d0
+               S01:0000236C:  33 C0 00 3C 00 00
+F12:0079       	asl.w #8,d2 ; move byte from param in d2 to upper half of word
+               S01:00002372:  E1 42
+F12:0080       	moveq #$0,d0 ;clear d0
+               S01:00002374:  70 00
+F12:0081       	move.w (a0),d1 ;load word to print from ram
+               S01:00002376:  32 10
+F12:0082       	;print high nybble
+F12:0083       	move.w d1,d0
+               S01:00002378:  30 01
+F12:0084       	rol.w #4,d0 ;isolate high nybble of high word
+               S01:0000237A:  E9 58
+F12:0085       	and.w #LO_NYBBLE_MASK,d0
+               S01:0000237C:  C0 7C 00 0F
+F12:0086       	jsr printNybble
+               S01:00002380:  4E B9 00 00 23 AA [R]
+F12:0087       	;print low nybble
+F12:0088       	move.w d1,d0
+               S01:00002386:  30 01
+F12:0089       	lsr.w #8,d0 ;isolate low nybble of high word
+               S01:00002388:  E0 48
+F12:0090       	and.w #LO_NYBBLE_MASK,d0
+               S01:0000238A:  C0 7C 00 0F
+F12:0091       	jsr printNybble
+               S01:0000238E:  4E B9 00 00 23 AA [R]
+F12:0092       	;print high nybble
+F12:0093       	move.b d1,d0
+               S01:00002394:  10 01
+F12:0094       	lsr.b #4,d0 ;isolate high nybble of low word
+               S01:00002396:  E8 08
+F12:0095       	jsr printNybble
+               S01:00002398:  4E B9 00 00 23 AA [R]
+F12:0096       	;print low nybble
+F12:0097       	move.b d1,d0
+               S01:0000239E:  10 01
+F12:0098       	and.b #LO_NYBBLE_MASK,d0 ;isolate low nybble of high word
+               S01:000023A0:  C0 3C 00 0F
+F12:0099       	jmp printNybble ;jmp instead of jsr because of tail call
+               S01:000023A4:  4E F9 00 00 23 AA [R]
+F12:0100       
+F12:0101       ;utility function for other prints, don't call directly. needs LSPC_ADDR
+F12:0102       ;to be set already
+F12:0103       ;d0 - data to print
+F12:0104       ;d2 - palette/page number
+F12:0105       printNybble:
+F12:0106       	cmp.b #$A,d0 
+               S01:000023AA:  B0 3C 00 0A
+F12:0107       	bcs .9orLess
+               S01:000023AE:  65 00 00 0C
+F12:0108       		add.b #ASCII_A_BASE,d0
+               S01:000023B2:  D0 3C 00 37
+F12:0109       		jmp .doneAdd
+               S01:000023B6:  4E F9 00 00 23 C0 [R]
+F12:0110       	.9orLess:
+F12:0111       		add.b #ASCII_BASE,d0
+               S01:000023BC:  D0 3C 00 30
+F12:0112       	.doneAdd:
+F12:0113       	or.w d2,d0 ; OR with the palette and page number
+               S01:000023C0:  80 42
+F12:0114       	move.w d0,LSPC_DATA ; write tile to fix layer
+               S01:000023C2:  33 C0 00 3C 00 02
+F12:0115       	rts
+               S01:000023C8:  4E 75
+F12:0116       
+F00:0022       	include "sprite.asm" ;sprite copy routines
+F13:0001       
+F13:0002       ;load a sprite's tiles linearly into vram
+F13:0003       ;d0 - sprite to start with
+F13:0004       ;d1 - tile # to start with
+F13:0005       ;d2 - sprite width
+F13:0006       ;d3 - sprite height
+F13:0007       ;d4 - sprite attributes
+F13:0008       spriteLoad:
+F13:0009       	move.w #1,LSPC_INCR
+               S01:000023CA:  33 FC 00 01 00 3C 00 04
+F13:0010       	asl.w #6,d0 ;sprites are 64 words apart
+               S01:000023D2:  ED 40
+F13:0011       	; add.w #SCB1,d0 ;initial offset (scb1 is 0)
+F13:0012       	move.w d2,d5 ;loop counter:#rows
+               S01:000023D4:  3A 02
+F13:0013       	sub.w #1,d5;make work with dbra
+               S01:000023D6:  9A 7C 00 01
+F13:0014       .copyRow:
+F13:0015       	move.w d1,d6 ;tile num to d5
+               S01:000023DA:  3C 01
+F13:0016       	move.w d0,LSPC_ADDR
+               S01:000023DC:  33 C0 00 3C 00 00
+F13:0017       	move.w d3,d7 ;loop counter:#cols
+               S01:000023E2:  3E 03
+F13:0018       	sub.w #1,d7
+               S01:000023E4:  9E 7C 00 01
+F13:0019       	.copyCol:
+F13:0020       		move.w d6,LSPC_DATA
+               S01:000023E8:  33 C6 00 3C 00 02
+F13:0021       		move.w d4,LSPC_DATA
+               S01:000023EE:  33 C4 00 3C 00 02
+F13:0022       		add.w d2,d6 ;move to next row in the sprite
+               S01:000023F4:  DC 42
+F13:0023       		dbra d7,.copyCol
+               S01:000023F6:  51 CF FF F0
+F13:0024       	add.w #64,d0 ;each sprite is 64 words
+               S01:000023FA:  D0 7C 00 40
+F13:0025       	add.w #1,d1 ;move to next column
+               S01:000023FE:  D2 7C 00 01
+F13:0026       	dbra d5,.copyRow
+               S01:00002402:  51 CD FF D6
+F13:0027       	rts
+               S01:00002406:  4E 75
+F13:0028       	
+F00:0023       	include "player.asm" ;player stuff
+F14:0001       playerInit:
+F14:0002       	move.l #$00500000,player_xPos
+               S01:00002408:  23 FC 00 50 00 00 00 10 00 12
+F14:0003       	move.l #$00500000,player_yPos
+               S01:00002412:  23 FC 00 50 00 00 00 10 00 16
+F14:0004       playerSet:	
+F14:0005       	move.w #SCB1+(33*64),LSPC_ADDR
+               S01:0000241C:  33 FC 08 40 00 3C 00 00
+F14:0006       	move.w #1,LSPC_INCR
+               S01:00002424:  33 FC 00 01 00 3C 00 04
+F14:0007       	move.w #100,LSPC_DATA
+               S01:0000242C:  33 FC 00 64 00 3C 00 02
+F14:0008       	move.w #$200,LSPC_DATA
+               S01:00002434:  33 FC 02 00 00 3C 00 02
+F14:0009       	move.w #103,LSPC_DATA
+               S01:0000243C:  33 FC 00 67 00 3C 00 02
+F14:0010       	move.w #$200,LSPC_DATA
+               S01:00002444:  33 FC 02 00 00 3C 00 02
+F14:0011       	
+F14:0012       	;set up shrink data in SCB2
+F14:0013       	move.w #SCB2+33,LSPC_ADDR
+               S01:0000244C:  33 FC 80 21 00 3C 00 00
+F14:0014       	move.w #$0FFF,LSPC_DATA
+               S01:00002454:  33 FC 0F FF 00 3C 00 02
+F14:0015       	
+F14:0016       	;set up y position data in SCB3
+F14:0017       	move.w #SCB3+33,LSPC_ADDR
+               S01:0000245C:  33 FC 82 21 00 3C 00 00
+F14:0018       	move.w player_yPos,d0
+               S01:00002464:  30 39 00 10 00 16
+F14:0019       	move.w #496,d1
+               S01:0000246A:  32 3C 01 F0
+F14:0020       	sub.w d0,d1
+               S01:0000246E:  92 40
+F14:0021       	asl.w #7,d1
+               S01:00002470:  EF 41
+F14:0022       	or.w #7,d1 ;sprite is 7 tiles high
+               S01:00002472:  82 7C 00 07
+F14:0023       	move.w d1,LSPC_DATA
+               S01:00002476:  33 C1 00 3C 00 02
+F14:0024       	
+F14:0025       	; sprite 1's x position in SCB4
+F14:0026       	move.w #SCB4+33,LSPC_ADDR
+               S01:0000247C:  33 FC 84 21 00 3C 00 00
+F14:0027       	move.w player_xPos,d0
+               S01:00002484:  30 39 00 10 00 12
+F14:0028       	asl.w #7,d0
+               S01:0000248A:  EF 40
+F14:0029       	move.w d0,LSPC_DATA ;x pos
+               S01:0000248C:  33 C0 00 3C 00 02
+F14:0030       	rts
+               S01:00002492:  4E 75
+F14:0031       
+F14:0032       PLAYER_ACCEL equ $8000
+F14:0033       playerMove:
+F14:0034       	move.b BIOS_P1CURRENT,d0
+               S01:00002494:  10 39 00 10 FD 96
+F14:0035       	move.b d0,d1
+               S01:0000249A:  12 00
+F14:0036       	and.b #$c,d0 ;are either left/right being pressed?
+               S01:0000249C:  C0 3C 00 0C
+F14:0037       	bne .testDirs ;if yes, do normal acceleration stuff
+               S01:000024A0:  66 00 00 32
+F14:0038       		move.l player_xSpeed,d0
+               S01:000024A4:  20 39 00 10 00 1A
+F14:0039       		beq .doneTests
+               S01:000024AA:  67 00 00 4C
+F14:0040       		and.l #$80000000,d0
+               S01:000024AE:  C0 BC 80 00 00 00
+F14:0041       		beq .subSpeed
+               S01:000024B4:  67 00 00 10
+F14:0042       		.addSpeed:
+F14:0043       			add.l #PLAYER_ACCEL,player_xSpeed
+               S01:000024B8:  06 B9 00 00 80 00 00 10 00 1A
+F14:0044       			bra .doneTests
+               S01:000024C2:  60 00 00 34
+F14:0045       		.subSpeed:
+F14:0046       			sub.l #PLAYER_ACCEL,player_xSpeed
+               S01:000024C6:  04 B9 00 00 80 00 00 10 00 1A
+F14:0047       			bra .doneTests
+               S01:000024D0:  60 00 00 26
+F14:0048       	.testDirs:
+F14:0049       		btst.b #JOY_LEFT,d1
+               S01:000024D4:  08 01 00 02
+F14:0050       		beq .NoLeft
+               S01:000024D8:  67 00 00 0C
+F14:0051       			sub.l #PLAYER_ACCEL,player_xSpeed
+               S01:000024DC:  04 B9 00 00 80 00 00 10 00 1A
+F14:0052       		.NoLeft:
+F14:0053       		btst.b #JOY_RIGHT,d1
+               S01:000024E6:  08 01 00 03
+F14:0054       		beq .NoRight
+               S01:000024EA:  67 00 00 0C
+F14:0055       			add.l #PLAYER_ACCEL,player_xSpeed
+               S01:000024EE:  06 B9 00 00 80 00 00 10 00 1A
+F14:0056       		.NoRight:
+F14:0057       .doneTests:
+F14:0058       	move.l player_xPos,d0
+               S01:000024F8:  20 39 00 10 00 12
+F14:0059       	add.l player_xSpeed,d0
+               S01:000024FE:  D0 B9 00 10 00 1A
+F14:0060       	move.l d0,player_xPos
+               S01:00002504:  23 C0 00 10 00 12
+F14:0061       	rts
+               S01:0000250A:  4E 75
+F14:0062       	
+F00:0024       	include "bg.asm" ;bg simulation routines
+F15:0001       ;background display routines
+F15:0002       SCREEN_COLS equ 20
+F15:0003       LEFT_FLAG equ 1
+F15:0004       RIGHT_FLAG equ 2
+F15:0005       
+F15:0006       ;loads background into 32x16 block
+F15:0007       ;a0: pointer to map data
+F15:0008       ;d0: which sprite # to load the bg at
+F15:0009       bgLoad:
+F15:0010       	move.w #1,LSPC_INCR
+               S01:0000250C:  33 FC 00 01 00 3C 00 04
+F15:0011       	asl.w #6,d0 ;d0 *= 64
+               S01:00002514:  ED 40
+F15:0012       	; add.w #SCB1,d0 ;scb0's address is 0 so this is unnecessary
+F15:0013       	moveq #31,d1 ;#cols - 1
+               S01:00002516:  72 1F
+F15:0014       .copyRow:
+F15:0015       	move.w d0,LSPC_ADDR
+               S01:00002518:  33 C0 00 3C 00 00
+F15:0016       	moveq #15,d2 ;#rows - 1
+               S01:0000251E:  74 0F
+F15:0017       	.copyCol:
+F15:0018       		move.w (a0)+,LSPC_DATA ;tile
+               S01:00002520:  33 D8 00 3C 00 02
+F15:0019       		move.w (a0)+,LSPC_DATA ;palette
+               S01:00002526:  33 D8 00 3C 00 02
+F15:0020       		dbra d2,.copyCol
+               S01:0000252C:  51 CA FF F2
+F15:0021       	add.w #64,d0
+               S01:00002530:  D0 7C 00 40
+F15:0022       	dbra d1,.copyRow
+               S01:00002534:  51 C9 FF E2
+F15:0023       	
+F15:0024       	;no shrink
+F15:0025       	move.w #SCB2+1,LSPC_ADDR
+               S01:00002538:  33 FC 80 01 00 3C 00 00
+F15:0026       	moveq #31,d1
+               S01:00002540:  72 1F
+F15:0027       .copyShrink:
+F15:0028       	move.w #$0FFF,LSPC_DATA ;no shrink
+               S01:00002542:  33 FC 0F FF 00 3C 00 02
+F15:0029       	dbra d1,.copyShrink
+               S01:0000254A:  51 C9 FF F6
+F15:0030       	
+F15:0031       	;y pos = 0
+F15:0032       	move.w #SCB3+1,LSPC_ADDR
+               S01:0000254E:  33 FC 82 01 00 3C 00 00
+F15:0033       	move.w #(496<<7)|16,LSPC_DATA ;496=0 y pos on neo geo, sprite is 16 tiles high
+               S01:00002556:  33 FC F8 10 00 3C 00 02
+F15:0034       	moveq #30,d1
+               S01:0000255E:  72 1E
+F15:0035       .copySticky:
+F15:0036       	move.w #$40,LSPC_DATA
+               S01:00002560:  33 FC 00 40 00 3C 00 02
+F15:0037       	dbra d1,.copySticky
+               S01:00002568:  51 C9 FF F6
+F15:0038       	
+F15:0039       	;x pos = 0
+F15:0040       	move.w #SCB4+1,LSPC_ADDR
+               S01:0000256C:  33 FC 84 01 00 3C 00 00
+F15:0041       	move.w #0,LSPC_DATA
+               S01:00002574:  33 FC 00 00 00 3C 00 02
+F15:0042       	
+F15:0043       	rts
+               S01:0000257C:  4E 75
+F15:0044       	
+F15:0045       ;updates bg from variables (called in vblank)
+F15:0046       bgUpdate:
+F15:0047       	move.w #SCB3+1,LSPC_ADDR
+               S01:0000257E:  33 FC 82 01 00 3C 00 00
+F15:0048       	move.w #(496<<7)|16,LSPC_DATA
+               S01:00002586:  33 FC F8 10 00 3C 00 02
+F15:0049       	move.w #SCB4+1,LSPC_ADDR
+               S01:0000258E:  33 FC 84 01 00 3C 00 00
+F15:0050       	move.w bg1_xPos,d0
+               S01:00002596:  30 39 00 10 00 0A
+F15:0051       	neg.w d0 ;transform from "distance from start of map" to "distance leftmost sprite has gone
+               S01:0000259C:  44 40
+F15:0052       	asl.w #7,d0 ;offscreen"
+               S01:0000259E:  EF 40
+F15:0053       	move.w d0,LSPC_DATA
+               S01:000025A0:  33 C0 00 3C 00 02
+F15:0054       	
+F15:0055       	moveq #0,d0 ;clear all of d0
+               S01:000025A6:  70 00
+F15:0056       	move.w bg1_xPos,d0
+               S01:000025A8:  30 39 00 10 00 0A
+F15:0057       	lsr.w #4,d0
+               S01:000025AE:  E8 48
+F15:0058       	cmp.w bg1_copiedCol,d0
+               S01:000025B0:  B0 79 00 10 00 10
+F15:0059       	beq .noTileBoundary
+               S01:000025B6:  67 00 00 46
+F15:0060       	blo .scrollingR
+               S01:000025BA:  65 00 00 22
+F15:0061       	.scrollingL: ;scroling left so copy more columns to the right
+F15:0062       		move.w d0,bg1_copiedCol
+               S01:000025BE:  33 C0 00 10 00 10
+F15:0063       		add.w #SCREEN_COLS+1,d0 ;get first offscreen column
+               S01:000025C4:  D0 7C 00 15
+F15:0064       		move.w d0,d1
+               S01:000025C8:  32 00
+F15:0065       		and.w #31,d1
+               S01:000025CA:  C2 7C 00 1F
+F15:0066       		add.w #1,d1 ;we start from sprite 1, not sprite 0
+               S01:000025CE:  D2 7C 00 01
+F15:0067       		lea map,a0
+               S01:000025D2:  41 F9 00 00 02 CC [R]
+F15:0068       		jmp copyCol ;not jsr because of tail-call
+               S01:000025D8:  4E F9 00 00 26 34 [R]
+F15:0069       	.scrollingR: ;scrolling right so copy more columns to the left
+F15:0070       		move.w d0,bg1_copiedCol
+               S01:000025DE:  33 C0 00 10 00 10
+F15:0071       		sub #1,d0 ;get first offscreen column
+               S01:000025E4:  90 7C 00 01
+F15:0072       		move.w d0,d1
+               S01:000025E8:  32 00
+F15:0073       		and.w #31,d1
+               S01:000025EA:  C2 7C 00 1F
+F15:0074       		add.w #1,d1 ;we start from sprite 1, not sprite 0
+               S01:000025EE:  D2 7C 00 01
+F15:0075       		lea map,a0
+               S01:000025F2:  41 F9 00 00 02 CC [R]
+F15:0076       		jmp copyCol ;not jsr because of tail-call	
+               S01:000025F8:  4E F9 00 00 26 34 [R]
+F15:0077       .noTileBoundary:
+F15:0078       	rts
+               S01:000025FE:  4E 75
+F15:0079       	
+F15:0080       ;sets background position
+F15:0081       ;d0- bg x position
+F15:0082       bgSet:
+F15:0083       	cmp.w bg1_xPos,d0
+               S01:00002600:  B0 79 00 10 00 0A
+F15:0084       	blo .scrollingL
+               S01:00002606:  65 00 00 10
+F15:0085       	bhi .scrollingR
+               S01:0000260A:  62 00 00 18
+F15:0086       	clr.w bg1_direction ;not scrolling either way
+               S01:0000260E:  42 79 00 10 00 0E
+F15:0087       	bra .doneTests
+               S01:00002614:  60 00 00 16
+F15:0088       .scrollingL:
+F15:0089       	move.w #LEFT_FLAG,bg1_direction
+               S01:00002618:  33 FC 00 01 00 10 00 0E
+F15:0090       	bra .doneTests
+               S01:00002620:  60 00 00 0A
+F15:0091       .scrollingR:
+F15:0092       	move.w #RIGHT_FLAG,bg1_direction
+               S01:00002624:  33 FC 00 02 00 10 00 0E
+F15:0093       .doneTests:
+F15:0094       	move.w d0,bg1_xPos
+               S01:0000262C:  33 C0 00 10 00 0A
+F15:0095       	rts
+               S01:00002632:  4E 75
+F15:0096       
+F15:0097       ;d0: column number to copy from map (long)
+F15:0098       ;d1: sprite to copy it to (word)
+F15:0099       ;a0: map pointer
+F15:0100       copyCol:
+F15:0101       	move.w #1,LSPC_INCR
+               S01:00002634:  33 FC 00 01 00 3C 00 04
+F15:0102       	asl.w #6,d1
+               S01:0000263C:  ED 41
+F15:0103       	move.w d1,LSPC_ADDR
+               S01:0000263E:  33 C1 00 3C 00 00
+F15:0104       	asl.l #6,d0 ;each column is 16 tiles, 2 words per tile, 2 bytes per word
+               S01:00002644:  ED 80
+F15:0105       	add.l d0,a0
+               S01:00002646:  D1 C0
+F15:0106       	moveq #15,d0 ;num tiles - 1
+               S01:00002648:  70 0F
+F15:0107       .copyLoop:
+F15:0108       	move.w (a0)+,LSPC_DATA
+               S01:0000264A:  33 D8 00 3C 00 02
+F15:0109       	move.w (a0)+,LSPC_DATA
+               S01:00002650:  33 D8 00 3C 00 02
+F15:0110       	dbra d0,.copyLoop
+               S01:00002656:  51 C8 FF F2
+F15:0111       	rts
+               S01:0000265A:  4E 75
+F15:0112       	
+F15:0113       	
+F00:0025       	
+F00:0026       ;******************************************************************************;
+F00:0027       ; == The required routines == ;
+F00:0028       ;******************************************************************************;
+F00:0029       ; These four routines are defined in the system header.
+F00:0030       ; They *require* being jmp'd to, so watch out if you're enabling optimizations.
+F00:0031       ; (This is why devpac compatibility mode is enabled in the build process, as
+F00:0032       ; it disables optimizations by default.)
+F00:0033       
 F00:0034       ;==============================================================================;
-F00:0035       
-F00:0036       USER:
-F00:0037       	move.b d0,REG_DIPSW ; kick watchdog
-               S01:00002528:  13 C0 00 30 00 01
-F00:0038       	lea $10F300,sp ; set stack pointer to $10F300 (BIOS_WORKRAM)
-               S01:0000252E:  4F F9 00 10 F3 00
-F00:0039       	move.w #0,LSPC_MODE ; Disable auto-animation and timer interrupts, set auto-anim speed to 0 frames
-               S01:00002534:  33 FC 00 00 00 3C 00 06
-F00:0040       	move.w #7,LSPC_IRQ_ACK ; acknowledge all IRQs
-               S01:0000253C:  33 FC 00 07 00 3C 00 0C
-F00:0041       
-F00:0042       	move.w #$2000,sr ; Enable VBlank interrupt, go Supervisor
-               S01:00002544:  46 FC 20 00
-F00:0043       
-F00:0044       	; Handle user request
-F00:0045       	moveq #0,d0 ; clear all bits of d0
-               S01:00002548:  70 00
-F00:0046       	move.b BIOS_USER_REQUEST,d0 ; put user request value into d0
-               S01:0000254A:  10 39 00 10 FD AE
-F00:0047       	lsl.b #2,d0 ; shift value left twice to get offset into tbl_UserRequestCommands
-               S01:00002550:  E5 08
-F00:0048       	lea tbl_UserRequestCommands,a0 ; load address of user commands
-               S01:00002552:  41 F9 00 00 25 64 [R]
-F00:0049       	movea.l (a0,d0),a0 ; get address from table and offset
-               S01:00002558:  20 70 00 00
-F00:0050       	jsr (a0) ; jump to subroutine (typically ends with a jmp SYSTEM_RETURN)
-               S01:0000255C:  4E 90
-F00:0051       	jmp SYSTEM_RETURN ; this is here just in case it doesn't...?
-               S01:0000255E:  4E F9 00 C0 04 44
-F00:0052       
-F00:0053       ;------------------------------------------------------------------------------;
-F00:0054       ; tbl_UserRequestCommands
-F00:0055       ; Table that contains the addresses for each BIOS_USER_REQUEST command.
-F00:0056       
-F00:0057       tbl_UserRequestCommands:
-F00:0058       	dc.l User_Initialize ; Command 0 (Initialize)
-               S01:00002564:  00 00 25 E8 [R]
-F00:0059       	dc.l SYSTEM_RETURN ; Command 1 (Custom Eyecatch, unused)
-               S01:00002568:  00 C0 04 44
-F00:0060       	dc.l User_Main ; Command 2 (Demo Game/Game)
-               S01:0000256C:  00 00 25 EE [R]
-F00:0061       	dc.l User_Main ; Command 3 (Title Display)
-               S01:00002570:  00 00 25 EE [R]
-F00:0062       
-F00:0063       ;==============================================================================;
-F00:0064       ; PLAYER_START
-F00:0065       ; Called when a player presses Start with coins in the machine or if the
-F00:0066       ; attract mode timer reaches 0 (when the compulsion timer is enabled).
-F00:0067       ;==============================================================================;
-F00:0068       
-F00:0069       PLAYER_START:
-F00:0070       	; In this demo, we don't handle the Start button, or coins, for that matter.
-F00:0071       	rts
-               S01:00002574:  4E 75
-F00:0072       
-F00:0073       ;==============================================================================;
-F00:0074       ; DEMO_END
-F00:0075       ;==============================================================================;
-F00:0076       
-F00:0077       DEMO_END:
-F00:0078       	rts ; we're not doing anything in this routine, so just exit.
-               S01:00002576:  4E 75
+F00:0035       ; USER
+F00:0036       ; Respond to the system ROM's request (BIOS_USER_REQUEST).
+F00:0037       ;==============================================================================;
+F00:0038       
+F00:0039       USER:
+F00:0040       	move.b d0,REG_DIPSW ; kick watchdog
+               S01:0000265C:  13 C0 00 30 00 01
+F00:0041       	lea $10F300,sp ; set stack pointer to $10F300 (BIOS_WORKRAM)
+               S01:00002662:  4F F9 00 10 F3 00
+F00:0042       	move.w #0,LSPC_MODE ; Disable auto-animation and timer interrupts, set auto-anim speed to 0 frames
+               S01:00002668:  33 FC 00 00 00 3C 00 06
+F00:0043       	move.w #7,LSPC_IRQ_ACK ; acknowledge all IRQs
+               S01:00002670:  33 FC 00 07 00 3C 00 0C
+F00:0044       
+F00:0045       	move.w #$2000,sr ; Enable VBlank interrupt, go Supervisor
+               S01:00002678:  46 FC 20 00
+F00:0046       
+F00:0047       	; Handle user request
+F00:0048       	moveq #0,d0 ; clear all bits of d0
+               S01:0000267C:  70 00
+F00:0049       	move.b BIOS_USER_REQUEST,d0 ; put user request value into d0
+               S01:0000267E:  10 39 00 10 FD AE
+F00:0050       	lsl.b #2,d0 ; shift value left twice to get offset into tbl_UserRequestCommands
+               S01:00002684:  E5 08
+F00:0051       	lea tbl_UserRequestCommands,a0 ; load address of user commands
+               S01:00002686:  41 F9 00 00 26 98 [R]
+F00:0052       	movea.l (a0,d0),a0 ; get address from table and offset
+               S01:0000268C:  20 70 00 00
+F00:0053       	jsr (a0) ; jump to subroutine (typically ends with a jmp SYSTEM_RETURN)
+               S01:00002690:  4E 90
+F00:0054       	jmp SYSTEM_RETURN ; this is here just in case it doesn't...?
+               S01:00002692:  4E F9 00 C0 04 44
+F00:0055       
+F00:0056       ;------------------------------------------------------------------------------;
+F00:0057       ; tbl_UserRequestCommands
+F00:0058       ; Table that contains the addresses for each BIOS_USER_REQUEST command.
+F00:0059       
+F00:0060       tbl_UserRequestCommands:
+F00:0061       	dc.l User_Initialize ; Command 0 (Initialize)
+               S01:00002698:  00 00 27 22 [R]
+F00:0062       	dc.l SYSTEM_RETURN ; Command 1 (Custom Eyecatch, unused)
+               S01:0000269C:  00 C0 04 44
+F00:0063       	dc.l User_Main ; Command 2 (Demo Game/Game)
+               S01:000026A0:  00 00 27 28 [R]
+F00:0064       	dc.l User_Main ; Command 3 (Title Display)
+               S01:000026A4:  00 00 27 28 [R]
+F00:0065       
+F00:0066       ;==============================================================================;
+F00:0067       ; PLAYER_START
+F00:0068       ; Called when a player presses Start with coins in the machine or if the
+F00:0069       ; attract mode timer reaches 0 (when the compulsion timer is enabled).
+F00:0070       ;==============================================================================;
+F00:0071       
+F00:0072       PLAYER_START:
+F00:0073       	; In this demo, we don't handle the Start button, or coins, for that matter.
+F00:0074       	rts
+               S01:000026A8:  4E 75
+F00:0075       
+F00:0076       ;==============================================================================;
+F00:0077       ; DEMO_END
+F00:0078       ;==============================================================================;
 F00:0079       
-F00:0080       ;==============================================================================;
-F00:0081       ; COIN_SOUND
-F00:0082       ; Play a sound upon coin insertion.
+F00:0080       DEMO_END:
+F00:0081       	rts ; we're not doing anything in this routine, so just exit.
+               S01:000026AA:  4E 75
+F00:0082       
 F00:0083       ;==============================================================================;
-F00:0084       
-F00:0085       COIN_SOUND:
-F00:0086       	rts  ; we're not doing anything in this routine, so just exit.
-               S01:00002578:  4E 75
+F00:0084       ; COIN_SOUND
+F00:0085       ; Play a sound upon coin insertion.
+F00:0086       ;==============================================================================;
 F00:0087       
-F00:0088       ;******************************************************************************;
-F00:0089       ; == Interrupt Routines == ;
-F00:0090       ;******************************************************************************;
-F00:0091       ; These routines are called from external sources. Since they can interrupt the
-F00:0092       ; code at any possible moment, it's important to save and restore the registers
-F00:0093       ; before performing any work.
-F00:0094       
-F00:0095       ; (of course, you can still use instructions that don't touch the registers...)
-F00:0096       ;==============================================================================;
-F00:0097       ; VBlank
-F00:0098       ; Vertical blanking interrupt. Called once per frame.
-F00:0099       
-F00:0100       VBlank:
-F00:0101       	btst #7,BIOS_SYSTEM_MODE ; check if the System ROM wants to run its VBlank routine.
-               S01:0000257A:  08 39 00 07 00 10 FD 80
-F00:0102       	bne.s .VBlank_game ; if not, run our VBlank.
-               S01:00002582:  66 06
-F00:0103       	jmp SYSTEM_INT1 ; jump to system ROM's VBlank routine
-               S01:00002584:  4E F9 00 C0 04 38
-F00:0104       
-F00:0105       .VBlank_game:
-F00:0106       	movem.l d0-d7/a0-a6,-(sp) ; save registers to the stack
-               S01:0000258A:  48 E7 FF FE
-F00:0107       	move.w #4,LSPC_IRQ_ACK ; acknowledge the VBlank interrupt
-               S01:0000258E:  33 FC 00 04 00 3C 00 0C
-F00:0108       	move.b d0,REG_DIPSW ; kick the watchdog
-               S01:00002596:  13 C0 00 30 00 01
-F00:0109       
-F00:0110       	; [Things to perform in VBlank]
-F00:0111       	; VBlank is where you should be doing sprite data updates (SCB writes) and
-F00:0112       	; palette RAM updates.
-F00:0113       	;update RAM locations for joypad inputs
-F00:0114       	jsr SYSTEM_IO
-               S01:0000259C:  4E B9 00 C0 04 4A
-F00:0115       	jsr bgUpdate
-               S01:000025A2:  4E B9 00 00 24 4A [R]
-F00:0116       	; move.w #1,LSPC_INCR
-F00:0117       	; move.w #SCB2+1,LSPC_ADDR
-F00:0118       	; moveq #9,d1 ;10 sprites - 1
-F00:0119       	; .copySCB2:
-F00:0120       		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-F00:0121       		; dbra d1,.copySCB2
-F00:0122       	
-F00:0123       	; move.w #SCB3+1,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
-F00:0124       	; move.w spr_yPos,d0
-F00:0125       	; move.w #496,d1
-F00:0126       	; sub.w d0,d1
-F00:0127       	; asl.w #7,d1
-F00:0128       	; or.w #7,d1 ;sprite is 7 tiles high
-F00:0129       	; move.w d1,LSPC_DATA
-F00:0130       	
-F00:0131       	; move.w #SCB4+1,LSPC_ADDR
-F00:0132       	; move.w spr_xPos,d0
-F00:0133       	; asl.w #7,d0
-F00:0134       	; move.w d0,LSPC_DATA ;x pos
-F00:0135       	
-F00:0136       
-F00:0137       .VBlank_end:
-F00:0138       	move.b #0,flag_VBlank ; clear vblank flag so WaitVBlank knows to stop
-               S01:000025A8:  13 FC 00 00 00 10 00 00
-F00:0139       	movem.l (sp)+,d0-d7/a0-a6 ; restore registers from the stack
-               S01:000025B0:  4C DF 7F FF
-F00:0140       	rte
-               S01:000025B4:  4E 73
-F00:0141       
-F00:0142       ;==============================================================================;
-F00:0143       ; IRQ2
-F00:0144       ; Horizontal blanking interrupt.
+F00:0088       COIN_SOUND:
+F00:0089       	rts  ; we're not doing anything in this routine, so just exit.
+               S01:000026AC:  4E 75
+F00:0090       
+F00:0091       ;******************************************************************************;
+F00:0092       ; == Interrupt Routines == ;
+F00:0093       ;******************************************************************************;
+F00:0094       ; These routines are called from external sources. Since they can interrupt the
+F00:0095       ; code at any possible moment, it's important to save and restore the registers
+F00:0096       ; before performing any work.
+F00:0097       
+F00:0098       ; (of course, you can still use instructions that don't touch the registers...)
+F00:0099       ;==============================================================================;
+F00:0100       ; VBlank
+F00:0101       ; Vertical blanking interrupt. Called once per frame.
+F00:0102       
+F00:0103       VBlank:
+F00:0104       	btst #7,BIOS_SYSTEM_MODE ; check if the System ROM wants to run its VBlank routine.
+               S01:000026AE:  08 39 00 07 00 10 FD 80
+F00:0105       	bne.s .VBlank_game ; if not, run our VBlank.
+               S01:000026B6:  66 06
+F00:0106       	jmp SYSTEM_INT1 ; jump to system ROM's VBlank routine
+               S01:000026B8:  4E F9 00 C0 04 38
+F00:0107       
+F00:0108       .VBlank_game:
+F00:0109       	movem.l d0-d7/a0-a6,-(sp) ; save registers to the stack
+               S01:000026BE:  48 E7 FF FE
+F00:0110       	move.w #4,LSPC_IRQ_ACK ; acknowledge the VBlank interrupt
+               S01:000026C2:  33 FC 00 04 00 3C 00 0C
+F00:0111       	move.b d0,REG_DIPSW ; kick the watchdog
+               S01:000026CA:  13 C0 00 30 00 01
+F00:0112       
+F00:0113       	; [Things to perform in VBlank]
+F00:0114       	; VBlank is where you should be doing sprite data updates (SCB writes) and
+F00:0115       	; palette RAM updates.
+F00:0116       	;update RAM locations for joypad inputs
+F00:0117       	jsr SYSTEM_IO
+               S01:000026D0:  4E B9 00 C0 04 4A
+F00:0118       	jsr bgUpdate
+               S01:000026D6:  4E B9 00 00 25 7E [R]
+F00:0119       	jsr playerSet
+               S01:000026DC:  4E B9 00 00 24 1C [R]
+F00:0120       	; move.w #1,LSPC_INCR
+F00:0121       	; move.w #SCB2+1,LSPC_ADDR
+F00:0122       	; moveq #9,d1 ;10 sprites - 1
+F00:0123       	; .copySCB2:
+F00:0124       		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
+F00:0125       		; dbra d1,.copySCB2
+F00:0126       	
+F00:0127       	; move.w #SCB3+1,LSPC_ADDR ;y pos (given to LSPC as 496-yPos)
+F00:0128       	; move.w spr_yPos,d0
+F00:0129       	; move.w #496,d1
+F00:0130       	; sub.w d0,d1
+F00:0131       	; asl.w #7,d1
+F00:0132       	; or.w #7,d1 ;sprite is 7 tiles high
+F00:0133       	; move.w d1,LSPC_DATA
+F00:0134       	
+F00:0135       	; move.w #SCB4+1,LSPC_ADDR
+F00:0136       	; move.w spr_xPos,d0
+F00:0137       	; asl.w #7,d0
+F00:0138       	; move.w d0,LSPC_DATA ;x pos
+F00:0139       	
+F00:0140       
+F00:0141       .VBlank_end:
+F00:0142       	move.b #0,flag_VBlank ; clear vblank flag so WaitVBlank knows to stop
+               S01:000026E2:  13 FC 00 00 00 10 00 00
+F00:0143       	movem.l (sp)+,d0-d7/a0-a6 ; restore registers from the stack
+               S01:000026EA:  4C DF 7F FF
+F00:0144       	rte
+               S01:000026EE:  4E 73
 F00:0145       
-F00:0146       IRQ2:
-F00:0147       	move.w #2,LSPC_IRQ_ACK ; ack. interrupt #2 (HBlank)
-               S01:000025B6:  33 FC 00 02 00 3C 00 0C
-F00:0148       	move.b d0,REG_DIPSW    ; kick watchdog
-               S01:000025BE:  13 C0 00 30 00 01
-F00:0149       	rte
-               S01:000025C4:  4E 73
-F00:0150       
-F00:0151       ;==============================================================================;
-F00:0152       ; IRQ3
-F00:0153       ; Interrupt for CD systems.
+F00:0146       ;==============================================================================;
+F00:0147       ; IRQ2
+F00:0148       ; Horizontal blanking interrupt.
+F00:0149       
+F00:0150       IRQ2:
+F00:0151       	move.w #2,LSPC_IRQ_ACK ; ack. interrupt #2 (HBlank)
+               S01:000026F0:  33 FC 00 02 00 3C 00 0C
+F00:0152       	move.b d0,REG_DIPSW    ; kick watchdog
+               S01:000026F8:  13 C0 00 30 00 01
+F00:0153       	rte
+               S01:000026FE:  4E 73
 F00:0154       
-F00:0155       IRQ3:
-F00:0156       	move.w #1,LSPC_IRQ_ACK ; acknowledge interrupt 3
-               S01:000025C6:  33 FC 00 01 00 3C 00 0C
-F00:0157       	move.b d0,REG_DIPSW ; kick watchdog
-               S01:000025CE:  13 C0 00 30 00 01
-F00:0158       	rte
-               S01:000025D4:  4E 73
-F00:0159       
-F00:0160       ;==============================================================================;
-F00:0161       ; WaitVBlank
-F00:0162       ; Waits for VBlank to finish via a flag.
-F00:0163       ; (Not an interrupt routine, but related to it)
-F00:0164       
-F00:0165       WaitVBlank:
-F00:0166       	move.b #1,flag_VBlank ; set vblank flag to 1.
-               S01:000025D6:  13 FC 00 01 00 10 00 00
-F00:0167       .WaitVBlank_loop:
-F00:0168       	tst.b flag_VBlank ; check if vblank flag is 0.
-               S01:000025DE:  4A 39 00 10 00 00
-F00:0169       	bne.s .WaitVBlank_loop ; if not zero, loop until it is.
-               S01:000025E4:  66 F8
-F00:0170       	rts
-               S01:000025E6:  4E 75
-F00:0171       
-F00:0172       ;******************************************************************************;
-F00:0173       ; == USER request routines == ;
-F00:0174       ;******************************************************************************;
-F00:0175       ; User_Initialize
-F00:0176       
-F00:0177       User_Initialize:
-F00:0178       	; this would be the place to initialize high scores and other such data in
-F00:0179       	; the backup RAM area (see cart/cd header, "pointer to backup RAM block").
+F00:0155       ;==============================================================================;
+F00:0156       ; IRQ3
+F00:0157       ; Interrupt for CD systems.
+F00:0158       
+F00:0159       IRQ3:
+F00:0160       	move.w #1,LSPC_IRQ_ACK ; acknowledge interrupt 3
+               S01:00002700:  33 FC 00 01 00 3C 00 0C
+F00:0161       	move.b d0,REG_DIPSW ; kick watchdog
+               S01:00002708:  13 C0 00 30 00 01
+F00:0162       	rte
+               S01:0000270E:  4E 73
+F00:0163       
+F00:0164       ;==============================================================================;
+F00:0165       ; WaitVBlank
+F00:0166       ; Waits for VBlank to finish via a flag.
+F00:0167       ; (Not an interrupt routine, but related to it)
+F00:0168       
+F00:0169       WaitVBlank:
+F00:0170       	move.b #1,flag_VBlank ; set vblank flag to 1.
+               S01:00002710:  13 FC 00 01 00 10 00 00
+F00:0171       .WaitVBlank_loop:
+F00:0172       	tst.b flag_VBlank ; check if vblank flag is 0.
+               S01:00002718:  4A 39 00 10 00 00
+F00:0173       	bne.s .WaitVBlank_loop ; if not zero, loop until it is.
+               S01:0000271E:  66 F8
+F00:0174       	rts
+               S01:00002720:  4E 75
+F00:0175       
+F00:0176       ;******************************************************************************;
+F00:0177       ; == USER request routines == ;
+F00:0178       ;******************************************************************************;
+F00:0179       ; User_Initialize
 F00:0180       
-F00:0181       	; in this demo we don't do anything, so just jump to SYSTEM_RETURN.
-F00:0182       	jmp SYSTEM_RETURN
-               S01:000025E8:  4E F9 00 C0 04 44
-F00:0183       
-F00:0184       ;==============================================================================;
-F00:0185       ; User_Main
-F00:0186       
-F00:0187       User_Main:
-F00:0188       	; In a real Neo-Geo program, this would be handled differently, but this is
-F00:0189       	; a demo, so it's going to be simpler than expected.
+F00:0181       User_Initialize:
+F00:0182       	; this would be the place to initialize high scores and other such data in
+F00:0183       	; the backup RAM area (see cart/cd header, "pointer to backup RAM block").
+F00:0184       
+F00:0185       	; in this demo we don't do anything, so just jump to SYSTEM_RETURN.
+F00:0186       	jmp SYSTEM_RETURN
+               S01:00002722:  4E F9 00 C0 04 44
+F00:0187       
+F00:0188       ;==============================================================================;
+F00:0189       ; User_Main
 F00:0190       
-F00:0191       	; --perform initialization, part 1--
-F00:0192       	; (Palette)
-F00:0193       	; The reference color (address $400000) must be set to the darkest possible
-F00:0194       	; color, which is $8000. (Black with the 'dark bit' set.)
-F00:0195       	move.w #$8000,PALETTE_REFERENCE
-               S01:000025EE:  33 FC 80 00 00 40 00 00
-F00:0196       
-F00:0197       	; Set the background color ($401FFE) to a regular black ($0000).
-F00:0198       	move.w #0,PALETTE_BACKDROP
-               S01:000025F6:  33 FC 00 00 00 40 1F FE
-F00:0199       
-F00:0200       	; Finally, we need to set a color for the text to display. Set the first
-F00:0201       	; palette entry in the first palette row ($40xxxx) to white ($0FFF).
-F00:0202       	move.w #$0FFF,PALETTES+2
-               S01:000025FE:  33 FC 0F FF 00 40 00 02
+F00:0191       User_Main:
+F00:0192       	; In a real Neo-Geo program, this would be handled differently, but this is
+F00:0193       	; a demo, so it's going to be simpler than expected.
+F00:0194       
+F00:0195       	; --perform initialization, part 1--
+F00:0196       	; (Palette)
+F00:0197       	; The reference color (address $400000) must be set to the darkest possible
+F00:0198       	; color, which is $8000. (Black with the 'dark bit' set.)
+F00:0199       	move.w #$8000,PALETTE_REFERENCE
+               S01:00002728:  33 FC 80 00 00 40 00 00
+F00:0200       
+F00:0201       	; Set the background color ($401FFE) to a regular black ($0000).
+F00:0202       	move.w #0,PALETTE_BACKDROP
+               S01:00002730:  33 FC 00 00 00 40 1F FE
 F00:0203       
-F00:0204       	; (Fix Layer)
-F00:0205       	; The System ROM provides a command to set up the Fix layer, and it should
-F00:0206       	; typically be called at boot.
-F00:0207       	jsr FIX_CLEAR ; jump to the FIX_CLEAR subroutine
-               S01:00002606:  4E B9 00 C0 04 C2
-F00:0208       
-F00:0209       	; (Sprites)
-F00:0210       	; Sprites will need to be initialized as well. The System ROM provides a
-F00:0211       	; routine for this purpose as well.
-F00:0212       	jsr LSP_1st ; jump to the LSP_1st subroutine
-               S01:0000260C:  4E B9 00 C0 04 C8
-F00:0213       	
-F00:0214       	move.w #80,spr_xPos ;clear variables
-               S01:00002612:  33 FC 00 50 00 10 00 04
-F00:0215       	move.w #80,spr_yPos
-               S01:0000261A:  33 FC 00 50 00 10 00 06
-F00:0216       	move.b #$f,spr_xShrink ;x shrink is only 4 bits, set to no shrinking
-               S01:00002622:  13 FC 00 0F 00 10 00 08
-F00:0217       	move.b #$ff,spr_yShrink ;y shrink is 8 bits
-               S01:0000262A:  13 FC 00 FF 00 10 00 09
-F00:0218       	
-F00:0219       	moveq #$1,d0 ;write to palette 1
-               S01:00002632:  70 01
-F00:0220       	lea WeebPalette,a0
-               S01:00002634:  41 F9 00 00 26 E8 [R]
-F00:0221       	jsr LoadPalette
-               S01:0000263A:  4E B9 00 00 27 08 [R]
+F00:0204       	; Finally, we need to set a color for the text to display. Set the first
+F00:0205       	; palette entry in the first palette row ($40xxxx) to white ($0FFF).
+F00:0206       	move.w #$0FFF,PALETTES+2
+               S01:00002738:  33 FC 0F FF 00 40 00 02
+F00:0207       
+F00:0208       	; (Fix Layer)
+F00:0209       	; The System ROM provides a command to set up the Fix layer, and it should
+F00:0210       	; typically be called at boot.
+F00:0211       	jsr FIX_CLEAR ; jump to the FIX_CLEAR subroutine
+               S01:00002740:  4E B9 00 C0 04 C2
+F00:0212       
+F00:0213       	; (Sprites)
+F00:0214       	; Sprites will need to be initialized as well. The System ROM provides a
+F00:0215       	; routine for this purpose as well.
+F00:0216       	jsr LSP_1st ; jump to the LSP_1st subroutine
+               S01:00002746:  4E B9 00 C0 04 C8
+F00:0217       	
+F00:0218       	move.w #80,spr_xPos ;clear variables
+               S01:0000274C:  33 FC 00 50 00 10 00 04
+F00:0219       	move.w #80,spr_yPos
+               S01:00002754:  33 FC 00 50 00 10 00 06
+F00:0220       	move.b #$f,spr_xShrink ;x shrink is only 4 bits, set to no shrinking
+               S01:0000275C:  13 FC 00 0F 00 10 00 08
+F00:0221       	move.b #$ff,spr_yShrink ;y shrink is 8 bits
+               S01:00002764:  13 FC 00 FF 00 10 00 09
 F00:0222       	
-F00:0223       	;tell MESS_OUT we're busy messing with the data, so don't run.
-F00:0224       	bset.b	#0,BIOS_MESS_BUSY
-               S01:00002640:  08 F9 00 00 00 10 FD C2
-F00:0225       	
-F00:0226       	; ;set up tiles in SCB1
-F00:0227       	; moveq #1,d0 ;sprite #1
-F00:0228       	; moveq #0,d1 ;tile #0
-F00:0229       	; moveq #10,d2 ;sprite is 10 tiles wide
-F00:0230       	; moveq #7,d3 ;sprite is 7 tiles tall
-F00:0231       	; move.w #$100,d4 ;palette 1, no special attributes
-F00:0232       	; jsr spriteLoad
+F00:0223       	moveq #$1,d0 ;write to palette 1
+               S01:0000276C:  70 01
+F00:0224       	lea bgPal,a0
+               S01:0000276E:  41 F9 00 00 22 CC [R]
+F00:0225       	jsr LoadPalette
+               S01:00002774:  4E B9 00 00 28 12 [R]
+F00:0226       	
+F00:0227       	moveq #$2,d0
+               S01:0000277A:  70 02
+F00:0228       	lea guyPal,a0
+               S01:0000277C:  41 F9 00 00 22 DC [R]
+F00:0229       	jsr LoadPalette
+               S01:00002782:  4E B9 00 00 28 12 [R]
+F00:0230       	
+F00:0231       	;tell MESS_OUT we're busy messing with the data, so don't run.
+F00:0232       	bset.b	#0,BIOS_MESS_BUSY
+               S01:00002788:  08 F9 00 00 00 10 FD C2
 F00:0233       	
 F00:0234       	moveq #1,d0
-               S01:00002648:  70 01
+               S01:00002790:  70 01
 F00:0235       	lea map,a0
-               S01:0000264A:  41 F9 00 00 02 CC [R]
+               S01:00002792:  41 F9 00 00 02 CC [R]
 F00:0236       	jsr bgLoad
-               S01:00002650:  4E B9 00 00 23 D8 [R]
+               S01:00002798:  4E B9 00 00 25 0C [R]
 F00:0237       	
-F00:0238       	; ;set up shrink data in SCB2
-F00:0239       	; move.w #SCB2+2,LSPC_ADDR
-F00:0240       	; moveq #9,d1
-F00:0241       	; .copySCB2:
-F00:0242       		; move.w spr_xShrink,LSPC_DATA ;copy x/y shrink data by accessing x as a word
-F00:0243       		; dbra d1,.copySCB2
-F00:0244       	
-F00:0245       	; ;set up y position data in SCB3
-F00:0246       	; move.w #SCB3+1,LSPC_ADDR
-F00:0247       	; move.w spr_yPos,d0
-F00:0248       	; move.w #496,d1
-F00:0249       	; sub.w d0,d1
-F00:0250       	; asl.w #7,d1
-F00:0251       	; or.w #7,d1 ;sprite is 7 tiles high
-F00:0252       	; move.w d1,LSPC_DATA
-F00:0253       	
-F00:0254       	; move.w #8,d0 ;sticky bits for remaining 9 sprites
-F00:0255       	; .copySCB3:
-F00:0256       		; move.w #$40,LSPC_DATA
-F00:0257       		; dbra d0,.copySCB3
+F00:0238       	jsr playerInit
+               S01:0000279E:  4E B9 00 00 24 08 [R]
+F00:0239       	
+F00:0240       	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
+               S01:000027A4:  08 B9 00 00 00 10 FD C2
+F00:0241       	
+F00:0242       	;play track 2 from the cd
+F00:0243       	moveq #2,d0 ;play track 2 with loop
+               S01:000027AC:  70 02
+F00:0244       CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
+F00:0245       	tst.b $10F6D9 ;so it might be important?
+               S01:000027AE:  4A 39 00 10 F6 D9
+F00:0246       	beq CDDALoadLoop
+               S01:000027B4:  67 00 FF F8
+F00:0247       	jsr BIOSF_CDDACMD
+               S01:000027B8:  4E B9 00 C0 05 6A
+F00:0248       	
+F00:0249       	
+F00:0250       Loop:
+F00:0251       	jsr playerMove
+               S01:000027BE:  4E B9 00 00 24 94 [R]
+F00:0252       	add.w #$1,frame_count	
+               S01:000027C4:  06 79 00 01 00 10 00 02
+F00:0253       	moveq #$4,d0
+               S01:000027CC:  70 04
+F00:0254       	moveq #$4,d1
+               S01:000027CE:  72 04
+F00:0255       	moveq #$3,d2
+               S01:000027D0:  74 03
+F00:0256       	lea frame_count,a0
+               S01:000027D2:  41 F9 00 10 00 02
+F00:0257       	jsr fix_PrintHexWord
+               S01:000027D8:  4E B9 00 00 23 5C [R]
 F00:0258       	
-F00:0259       	;sprite 1's x position in SCB4
-F00:0260       	; move.w #SCB4+1,LSPC_ADDR
-F00:0261       	; move.w spr_xPos,d0
-F00:0262       	; asl.w #7,d0
-F00:0263       	; move.w d0,LSPC_DATA ;x pos
-F00:0264       	
-F00:0265       	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
-               S01:00002656:  08 B9 00 00 00 10 FD C2
-F00:0266       	
-F00:0267       	;play track 2 from the cd
-F00:0268       	moveq #2,d0 ;play track 2 with loop
-               S01:0000265E:  70 02
-F00:0269       CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
-F00:0270       	tst.b $10F6D9 ;so it might be important?
-               S01:00002660:  4A 39 00 10 F6 D9
-F00:0271       	beq CDDALoadLoop
-               S01:00002666:  67 00 FF F8
-F00:0272       	jsr BIOSF_CDDACMD
-               S01:0000266A:  4E B9 00 C0 05 6A
-F00:0273       	
-F00:0274       	
-F00:0275       Loop:
-F00:0276       	move.b BIOS_P1CURRENT,d1
-               S01:00002670:  12 39 00 10 FD 96
-F00:0277       	; btst.b #JOY_UP,d0
-F00:0278       	; beq .NoUp
-F00:0279       		; sub.w #1,bg1_yPos
-F00:0280       	; .NoUp:
-F00:0281       	; btst.b #JOY_DOWN,d0
-F00:0282       	; beq .NoDown
-F00:0283       		; add.w #1,bg1_yPos
-F00:0284       	; .NoDown:
-F00:0285       	move.w bg1_xPos,d0
-               S01:00002676:  30 39 00 10 00 0A
-F00:0286       	btst.b #JOY_LEFT,d1
-               S01:0000267C:  08 01 00 02
-F00:0287       	beq .NoLeft
-               S01:00002680:  67 00 00 06
-F00:0288       		add.w #3,d0
-               S01:00002684:  D0 7C 00 03
-F00:0289       	.NoLeft:
-F00:0290       	btst.b #JOY_RIGHT,d1
-               S01:00002688:  08 01 00 03
-F00:0291       	beq .NoRight
-               S01:0000268C:  67 00 00 06
-F00:0292       		sub.w #3,d0
-               S01:00002690:  90 7C 00 03
-F00:0293       	.NoRight:
-F00:0294       	jsr bgSet
-               S01:00002694:  4E B9 00 00 24 CC [R]
-F00:0295       	; btst.b #JOY_A,d0
-F00:0296       	; beq .NoA
-F00:0297       		; sub.b #1,spr_xShrink
-F00:0298       	; .NoA:
-F00:0299       	; btst.b #JOY_B,d0
-F00:0300       	; beq .NoB
-F00:0301       		; add.b #1,spr_xShrink
-F00:0302       	; .NoB:	
-F00:0303       	; btst.b #JOY_C,d0
-F00:0304       	; beq .NoC
-F00:0305       		; sub.b #1,spr_yShrink
-F00:0306       	; .NoC:	
-F00:0307       	; btst.b #JOY_D,d0
-F00:0308       	; beq .NoD
-F00:0309       		; add.b #1,spr_yShrink
-F00:0310       	; .NoD:
-F00:0311       	
-F00:0312       	add.w #$1,frame_count	
-               S01:0000269A:  06 79 00 01 00 10 00 02
-F00:0313       	moveq #$4,d0
-               S01:000026A2:  70 04
-F00:0314       	moveq #$4,d1
-               S01:000026A4:  72 04
-F00:0315       	moveq #$3,d2
-               S01:000026A6:  74 03
-F00:0316       	lea frame_count,a0
-               S01:000026A8:  41 F9 00 10 00 02
-F00:0317       	jsr fix_PrintHexWord
-               S01:000026AE:  4E B9 00 00 23 2C [R]
-F00:0318       	
-F00:0319       	lea BIOS_P1CURRENT,a0
-               S01:000026B4:  41 F9 00 10 FD 96
-F00:0320       	moveq #$4,d0
-               S01:000026BA:  70 04
-F00:0321       	moveq #$5,d1
-               S01:000026BC:  72 05
-F00:0322       	moveq #$3,d2
-               S01:000026BE:  74 03
-F00:0323       	jsr fix_PrintHexByte	
-               S01:000026C0:  4E B9 00 00 22 FA [R]
-F00:0324       	jsr WaitVBlank
-               S01:000026C6:  4E B9 00 00 25 D6 [R]
-F00:0325       	jmp Loop
-               S01:000026CC:  4E F9 00 00 26 70 [R]
-F00:0326       
-F00:0327       str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
-               S01:000026D2:  48 69 2C 20 49 27 6D 20 61 20 4E 65 6F 2D 47 65
-               S01:000026E2:  6F 20 43 44 21
-               S01:000026E7:  FF
-F00:0328       
-F00:0329       WeebPalette:
-F00:0330       	dc.w $B423,$3744,$0855,$7A65,$A869,$3C88,$4CA9,$4CBC,$0FB9,$0FDB,$1FDC,$2FED,$0FEF,$5FFF,$6FFF,$FFFF
-               S01:000026E8:  B4 23
-               S01:000026EA:  37 44
-               S01:000026EC:  08 55
-               S01:000026EE:  7A 65
-               S01:000026F0:  A8 69
-               S01:000026F2:  3C 88
-               S01:000026F4:  4C A9
-               S01:000026F6:  4C BC
-               S01:000026F8:  0F B9
-               S01:000026FA:  0F DB
-               S01:000026FC:  1F DC
-               S01:000026FE:  2F ED
-               S01:00002700:  0F EF
-               S01:00002702:  5F FF
-               S01:00002704:  6F FF
-               S01:00002706:  FF FF
-F00:0331       
-F00:0332       ;copies palette into palette ram
-F00:0333       ;d0- palette number to copy to (long)
-F00:0334       ;a0- pointer to palette to copy
-F00:0335       LoadPalette:
-F00:0336       	asl.w #$5,d0 ;multiply d0 by $20 to get where to write in palette ram
-               S01:00002708:  EB 40
-F00:0337       	add.l #PALETTES,d0
-               S01:0000270A:  D0 BC 00 40 00 00
-F00:0338       	move.l d0,a1 ;address to a1
-               S01:00002710:  22 40
-F00:0339       	moveq #$F,d0 ;16 colors - 1
-               S01:00002712:  70 0F
-F00:0340       	.LoadLoop:
-F00:0341       		move.w (a0)+,(a1)+ ;copy stuff from wram to palette ram
-               S01:00002714:  32 D8
-F00:0342       		dbra d0,.LoadLoop
-               S01:00002716:  51 C8 FF FC
-F00:0343       	rts
-               S01:0000271A:  4E 75
-F00:0344       	
-F00:0345       	
-F00:0346       
-F00:0347       	
-F00:0348       
+F00:0259       	lea BIOS_P1CURRENT,a0
+               S01:000027DE:  41 F9 00 10 FD 96
+F00:0260       	moveq #$4,d0
+               S01:000027E4:  70 04
+F00:0261       	moveq #$5,d1
+               S01:000027E6:  72 05
+F00:0262       	moveq #$3,d2
+               S01:000027E8:  74 03
+F00:0263       	jsr fix_PrintHexByte	
+               S01:000027EA:  4E B9 00 00 23 2A [R]
+F00:0264       	jsr WaitVBlank
+               S01:000027F0:  4E B9 00 00 27 10 [R]
+F00:0265       	jmp Loop
+               S01:000027F6:  4E F9 00 00 27 BE [R]
+F00:0266       
+F00:0267       str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
+               S01:000027FC:  48 69 2C 20 49 27 6D 20 61 20 4E 65 6F 2D 47 65
+               S01:0000280C:  6F 20 43 44 21
+               S01:00002811:  FF
+F00:0268       
+F00:0269       ;copies palette into palette ram
+F00:0270       ;d0- palette number to copy to (long)
+F00:0271       ;a0- pointer to palette to copy
+F00:0272       LoadPalette:
+F00:0273       	asl.w #$5,d0 ;multiply d0 by $20 to get where to write in palette ram
+               S01:00002812:  EB 40
+F00:0274       	add.l #PALETTES,d0
+               S01:00002814:  D0 BC 00 40 00 00
+F00:0275       	move.l d0,a1 ;address to a1
+               S01:0000281A:  22 40
+F00:0276       	moveq #$F,d0 ;16 colors - 1
+               S01:0000281C:  70 0F
+F00:0277       	.LoadLoop:
+F00:0278       		move.w (a0)+,(a1)+ ;copy stuff from wram to palette ram
+               S01:0000281E:  32 D8
+F00:0279       		dbra d0,.LoadLoop
+               S01:00002820:  51 C8 FF FC
+F00:0280       	rts
+               S01:00002824:  4E 75
+F00:0281       	
+F00:0282       	
+F00:0283       
+F00:0284       	
+F00:0285       
 
 
 Sections:
@@ -7997,74 +8058,91 @@ F04  header_68k.inc
 F05  header_cd.inc
 F06  security.inc
 F07  softdips.inc
-F08  tools\neoconv\map.map
-F09  print.asm
-F10  sprite.asm
-F11  bg.asm
+F08  images\map.map
+F09  palettes.asm
+F10  images\bg.pal
+F11  images\guy.pal
+F12  print.asm
+F13  sprite.asm
+F14  player.asm
+F15  bg.asm
 
 
 Symbols:
- LoadPalette .LoadLoop LAB (0x2714) sec=CODE 
-str_HelloWorld LAB (0x26d2) UNUSED sec=CODE 
- Loop .NoRight LAB (0x2694) sec=CODE 
- Loop .NoLeft LAB (0x2688) sec=CODE 
-Loop LAB (0x2670) REF sec=CODE 
-CDDALoadLoop LAB (0x2660) sec=CODE 
-LoadPalette LAB (0x2708) REF sec=CODE 
-WeebPalette LAB (0x26e8) REF sec=CODE 
- WaitVBlank .WaitVBlank_loop LAB (0x25de) sec=CODE 
-WaitVBlank LAB (0x25d6) REF sec=CODE 
- VBlank .VBlank_end LAB (0x25a8) UNUSED sec=CODE 
- VBlank .VBlank_game LAB (0x258a) sec=CODE 
-User_Main LAB (0x25ee) REF sec=CODE 
-User_Initialize LAB (0x25e8) REF sec=CODE 
-tbl_UserRequestCommands LAB (0x2564) REF sec=CODE 
- copyCol .copyLoop LAB (0x2516) sec=CODE 
- bgSet .doneTests LAB (0x24f8) sec=CODE 
- bgSet .scrollingR LAB (0x24f0) sec=CODE 
- bgSet .scrollingL LAB (0x24e4) sec=CODE 
-bgSet LAB (0x24cc) REF sec=CODE 
-copyCol LAB (0x2500) REF sec=CODE 
- bgUpdate .scrollingL LAB (0x248a) UNUSED sec=CODE 
- bgUpdate .scrollingR LAB (0x24aa) sec=CODE 
- bgUpdate .noTileBoundary LAB (0x24ca) sec=CODE 
-bgUpdate LAB (0x244a) REF sec=CODE 
- bgLoad .copySticky LAB (0x242c) sec=CODE 
- bgLoad .copyShrink LAB (0x240e) sec=CODE 
- bgLoad .copyCol LAB (0x23ec) sec=CODE 
- bgLoad .copyRow LAB (0x23e4) sec=CODE 
-bgLoad LAB (0x23d8) REF sec=CODE 
+ LoadPalette .LoadLoop LAB (0x281e) sec=CODE 
+str_HelloWorld LAB (0x27fc) UNUSED sec=CODE 
+Loop LAB (0x27be) REF sec=CODE 
+CDDALoadLoop LAB (0x27ae) sec=CODE 
+LoadPalette LAB (0x2812) REF sec=CODE 
+ WaitVBlank .WaitVBlank_loop LAB (0x2718) sec=CODE 
+WaitVBlank LAB (0x2710) REF sec=CODE 
+ VBlank .VBlank_end LAB (0x26e2) UNUSED sec=CODE 
+ VBlank .VBlank_game LAB (0x26be) sec=CODE 
+User_Main LAB (0x2728) REF sec=CODE 
+User_Initialize LAB (0x2722) REF sec=CODE 
+tbl_UserRequestCommands LAB (0x2698) REF sec=CODE 
+ copyCol .copyLoop LAB (0x264a) sec=CODE 
+ bgSet .doneTests LAB (0x262c) sec=CODE 
+ bgSet .scrollingR LAB (0x2624) sec=CODE 
+ bgSet .scrollingL LAB (0x2618) sec=CODE 
+bgSet LAB (0x2600) UNUSED sec=CODE 
+copyCol LAB (0x2634) REF sec=CODE 
+ bgUpdate .scrollingL LAB (0x25be) UNUSED sec=CODE 
+ bgUpdate .scrollingR LAB (0x25de) sec=CODE 
+ bgUpdate .noTileBoundary LAB (0x25fe) sec=CODE 
+bgUpdate LAB (0x257e) REF sec=CODE 
+ bgLoad .copySticky LAB (0x2560) sec=CODE 
+ bgLoad .copyShrink LAB (0x2542) sec=CODE 
+ bgLoad .copyCol LAB (0x2520) sec=CODE 
+ bgLoad .copyRow LAB (0x2518) sec=CODE 
+bgLoad LAB (0x250c) REF sec=CODE 
 RIGHT_FLAG EXPR(2=0x2) EQU 
 LEFT_FLAG EXPR(1=0x1) EQU 
 SCREEN_COLS EXPR(20=0x14) EQU 
- spriteLoad .copyCol LAB (0x23b8) sec=CODE 
- spriteLoad .copyRow LAB (0x23aa) sec=CODE 
-spriteLoad LAB (0x239a) UNUSED sec=CODE 
- printNybble .doneAdd LAB (0x2390) REF sec=CODE 
- printNybble .9orLess LAB (0x238c) sec=CODE 
-fix_PrintHexWord LAB (0x232c) REF sec=CODE 
-printNybble LAB (0x237a) REF sec=CODE 
-fix_PrintHexByte LAB (0x22fa) REF sec=CODE 
- fix_PrintString .fix_PrintString_End LAB (0x22f8) sec=CODE 
- fix_PrintString .fix_PrintString_Loop LAB (0x22e6) sec=CODE 
-fix_PrintString LAB (0x22cc) UNUSED sec=CODE 
+ playerMove .NoRight LAB (0x24f8) sec=CODE 
+ playerMove .NoLeft LAB (0x24e6) sec=CODE 
+ playerMove .addSpeed LAB (0x24b8) UNUSED sec=CODE 
+ playerMove .subSpeed LAB (0x24c6) sec=CODE 
+ playerMove .doneTests LAB (0x24f8) sec=CODE 
+ playerMove .testDirs LAB (0x24d4) sec=CODE 
+playerMove LAB (0x2494) REF sec=CODE 
+PLAYER_ACCEL EXPR(32768=0x8000) EQU 
+playerSet LAB (0x241c) REF sec=CODE 
+playerInit LAB (0x2408) REF sec=CODE 
+ spriteLoad .copyCol LAB (0x23e8) sec=CODE 
+ spriteLoad .copyRow LAB (0x23da) sec=CODE 
+spriteLoad LAB (0x23ca) UNUSED sec=CODE 
+ printNybble .doneAdd LAB (0x23c0) REF sec=CODE 
+ printNybble .9orLess LAB (0x23bc) sec=CODE 
+fix_PrintHexWord LAB (0x235c) REF sec=CODE 
+printNybble LAB (0x23aa) REF sec=CODE 
+fix_PrintHexByte LAB (0x232a) REF sec=CODE 
+ fix_PrintString .fix_PrintString_End LAB (0x2328) sec=CODE 
+ fix_PrintString .fix_PrintString_Loop LAB (0x2316) sec=CODE 
+fix_PrintString LAB (0x22fc) UNUSED sec=CODE 
 ASCII_A_BASE EXPR(55=0x37) EQU 
 ASCII_BASE EXPR(48=0x30) EQU 
 HI_NYBBLE_MASK EXPR(240=0xf0) UNUSED EQU 
 LO_NYBBLE_MASK EXPR(15=0xf) EQU 
 FIX_ADDR EXPR(28706=0x7022) EQU 
+guyPal LAB (0x22dc) REF sec=CODE 
+bgPal LAB (0x22cc) REF sec=CODE 
 map LAB (0x2cc) REF sec=CODE 
 TRAP_CODE LAB (0x186) REF sec=CODE 
-COIN_SOUND LAB (0x2578) REF sec=CODE 
-DEMO_END LAB (0x2576) REF sec=CODE 
-PLAYER_START LAB (0x2574) REF sec=CODE 
-USER LAB (0x2528) REF sec=CODE 
+COIN_SOUND LAB (0x26ac) REF sec=CODE 
+DEMO_END LAB (0x26aa) REF sec=CODE 
+PLAYER_START LAB (0x26a8) REF sec=CODE 
+USER LAB (0x265c) REF sec=CODE 
 softDips_Europe LAB (0x288) REF sec=CODE 
 softDips_USA LAB (0x244) REF sec=CODE 
 softDips_Japan LAB (0x200) REF sec=CODE 
-IRQ3 LAB (0x25c6) REF sec=CODE 
-VBlank LAB (0x257a) REF sec=CODE 
-IRQ2 LAB (0x25b6) REF sec=CODE 
+IRQ3 LAB (0x2700) REF sec=CODE 
+VBlank LAB (0x26ae) REF sec=CODE 
+IRQ2 LAB (0x26f0) REF sec=CODE 
+player_ySpeed EXPR(1048606=0x10001e) UNUSED EQU 
+player_xSpeed EXPR(1048602=0x10001a) EQU 
+player_yPos EXPR(1048598=0x100016) EQU 
+player_xPos EXPR(1048594=0x100012) EQU 
 bg1_copiedCol EXPR(1048592=0x100010) EQU 
 bg1_direction EXPR(1048590=0x10000e) EQU 
 bg1_yPos EXPR(1048588=0x10000c) EQU 
@@ -8245,7 +8323,7 @@ BIOS_WORKRAM EXPR(1110784=0x10f300) UNUSED EQU
 SCB4 EXPR(33792=0x8400) EQU 
 SCB3 EXPR(33280=0x8200) EQU 
 SCB2 EXPR(32768=0x8000) EQU 
-SCB1 EXPR(0=0x0) UNUSED EQU 
+SCB1 EXPR(0=0x0) EQU 
 REG_UPBANK_PCM EXPR(16712099=0xff01a3) UNUSED EQU 
 REG_UPBANK_SPR EXPR(16712097=0xff01a1) UNUSED EQU 
 REG_CDDARIGHTTLEV EXPR(16712074=0xff018a) UNUSED EQU 

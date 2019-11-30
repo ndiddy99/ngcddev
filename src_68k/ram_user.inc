@@ -15,3 +15,9 @@ bg1_xPos equ spr_yShrink+1 ;(word)
 bg1_yPos equ bg1_xPos+2 ;word
 bg1_direction equ bg1_yPos+2 ;word
 bg1_copiedCol equ bg1_direction+2 ;word
+
+;player.asm
+player_xPos equ bg1_copiedCol+2 ;long
+player_yPos equ player_xPos+4 ;long
+player_xSpeed equ player_yPos+4 ;long
+player_ySpeed equ player_xSpeed+4 ;long

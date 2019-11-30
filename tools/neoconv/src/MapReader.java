@@ -73,7 +73,7 @@ public class MapReader {
             e.printStackTrace();
             return;
         }
-        writer.println(filename.substring(0, filename.indexOf('.')) + ":");
+        writer.println(filename.substring(filename.lastIndexOf('/') + 1, filename.indexOf('.')) + ":");
         for (int i = 0; i < mapArr[0].length; i++) {
             for (int j = 0; j < mapArr.length; j++) {
                 int tile = mapArr[j][i];

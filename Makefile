@@ -19,6 +19,8 @@ TOOL_MKISOFS = tools/mkisofs.exe
 # TOOL_ROMWAK - filename and/or path to romwak
 TOOL_ROMWAK = tools/romwak_x86.exe
 
+TOOL_NEOCONV = java -jar tools/neoconv.jar
+
 ################################################################################
 # input paths and filenames #
 #############################
@@ -37,7 +39,7 @@ INPUT_Z80 = $(SOURCE_Z80)/simple.asm
 INPUT_FIX = hello.fix
 
 # INPUT_SPR - filename of Sprite tile data file (4BPP SMS/GG/WSC format)
-INPUT_SPR = spr/out.spr
+INPUT_SPR = out.spr
 
 ################################################################################
 # output paths and filenames #
@@ -88,7 +90,7 @@ FLAGS_TARGET_CD   = TARGET_CD
 #==============================================================================#
 # cd - .iso file (for Neo-Geo CD)
 
-cd: cdfix cdprg cdz80 cdspr
+cd: cdspr cdfix cdprg cdz80
 	$(TOOL_MKISOFS) $(FLAGS_MKISOFS) -o $(OUTPUT_CDIMAGE) -V "$(NGCD_DISCLABEL)" $(CDFILES)
 
 #==============================================================================#
@@ -132,4 +134,7 @@ cdfix:
 # cdspr - cd sprite data
 
 cdspr:
+	cd images
+	$(TOOL_NEOCONV) -i images/bg.bmp -i images/guy.bmp -m images/map.tmx
+	cd ..
 	$(CP) $(INPUT_SPR) $(OUTPUT_SPR_CD)
