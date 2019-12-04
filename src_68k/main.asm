@@ -249,7 +249,7 @@ CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 	
 Loop:
 	jsr playerMove
-	add.w #$1,frame_count	
+	; add.w #$1,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
 	moveq #$3,d2
