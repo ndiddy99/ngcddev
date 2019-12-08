@@ -22,6 +22,7 @@
 	include "sprite.asm" ;sprite copy routines
 	include "player.asm" ;player stuff
 	include "bg.asm" ;bg simulation routines
+	include "collision.asm" ;collision detection
 	
 ;******************************************************************************;
 ; == The required routines == ;
@@ -115,7 +116,7 @@ VBlank:
 	; palette RAM updates.
 	;update RAM locations for joypad inputs
 	jsr SYSTEM_IO
-	jsr bgUpdate
+	; jsr bgUpdate
 	jsr playerSet
 	; move.w #1,LSPC_INCR
 	; move.w #SCB2+1,LSPC_ADDR
@@ -215,10 +216,13 @@ User_Main:
 	; routine for this purpose as well.
 	jsr LSP_1st ; jump to the LSP_1st subroutine
 	
-	move.w #80,spr_xPos ;clear variables
-	move.w #80,spr_yPos
-	move.b #$f,spr_xShrink ;x shrink is only 4 bits, set to no shrinking
-	move.b #$ff,spr_yShrink ;y shrink is 8 bits
+	;clear variables
+	clr.w frame_count
+	clr.w curr_tile
+	clr.w bg1_xPos
+	clr.w bg1_yPos
+	clr.w bg1_direction
+	clr.w bg1_copiedCol
 	
 	moveq #$1,d0 ;write to palette 1
 	lea bgPal,a0
@@ -249,7 +253,14 @@ CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 	
 Loop:
 	jsr playerMove
-	; add.w #$1,frame_count	
+	
+	move.w player_xPos,d0
+	move.w player_yPos,d1
+	lea map,a0
+	jsr collision_tileAt
+	move.w d0,curr_tile
+	
+	add.w #$1,frame_count	
 	moveq #$4,d0
 	moveq #$4,d1
 	moveq #$3,d2
@@ -260,7 +271,26 @@ Loop:
 	moveq #$4,d0
 	moveq #$5,d1
 	moveq #$3,d2
-	jsr fix_PrintHexByte	
+	jsr fix_PrintHexByte
+
+	lea player_xPos,a0
+	moveq #$4,d0
+	moveq #$6,d1
+	moveq #$3,d2
+	jsr fix_PrintHexWord
+
+	lea player_yPos,a0
+	moveq #$4,d0
+	moveq #$7,d1
+	moveq #$3,d2
+	jsr fix_PrintHexWord
+	
+	moveq #4,d0
+	moveq #8,d1
+	moveq #3,d2
+	lea curr_tile,a0
+	jsr fix_PrintHexWord
+	
 	jsr WaitVBlank
 	jmp Loop
 

@@ -1,7 +1,7 @@
 playerInit:
 	;init player variables
-	move.l #$00400000,player_xPos
-	move.l #$00500000,player_yPos
+	move.l #$00000000,player_xPos
+	move.l #$00000000,player_yPos
 	clr.l player_xSpeed
 	clr.l player_ySpeed
 	clr.w player_animTimer
@@ -24,7 +24,7 @@ playerSet:
 	move.w #496,d1
 	sub.w d0,d1
 	asl.w #7,d1
-	or.w #7,d1 ;sprite is 7 tiles high
+	or.w #2,d1 ;sprite is 2 tiles high
 	move.w d1,LSPC_DATA
 	
 	; sprite 1's x position in SCB4
@@ -40,34 +40,6 @@ HORIZ_FLIP equ $1
 PlayerTiles:
 	dc.w 101,100,102,100,$FFFF
 playerMove:
-	move.w player_xSpeed,d0
-	beq .dontAnim
-		move.w player_animTimer,d0
-		add.w #1,d0
-		cmp.w #7,d0
-		beq .animPlayer
-			move.w d0,player_animTimer
-			bra .dontAnim
-		.animPlayer:
-			clr.w player_animTimer
-			move.w player_tileIndex,d0
-			lea PlayerTiles,a0
-			move.w (a0,d0),d1
-			cmp.w #$FFFF,d1
-			bne .notEndList
-				move.w #0,d0
-				move.w (a0),d1
-		.notEndList:
-			add.w #2,d0 ;next word
-			move.w d0,player_tileIndex
-			;correct tile is now in d1
-			move.w #SCB1+(33*64),LSPC_ADDR
-			move.w #2,LSPC_INCR
-			move.w d1,LSPC_DATA
-			add.w #3,d1
-			move.w d1,LSPC_DATA
-	.dontAnim:
-	
 	move.b BIOS_P1CURRENT,d0
 	move.b d0,d1
 	and.b #$c,d0 ;are either left/right being pressed?
@@ -122,8 +94,51 @@ playerMove:
 			move.w d0,LSPC_DATA			
 		.NoRight:
 .doneTests:
+
+	btst.b #JOY_UP,d1
+	beq .NoUp
+		sub.l #$30000,player_yPos
+	.NoUp:
+	btst.b #JOY_DOWN,d1
+	beq .NoDown
+		add.l #$30000,player_yPos
+	.NoDown:
+
 	move.l player_xPos,d0
 	add.l player_xSpeed,d0
 	move.l d0,player_xPos
+
+	;animate player based on movement
+	move.w player_xSpeed,d0
+	bne .normalAnimate
+		move.w #2,player_tileIndex
+		bra .writeTile
+	.normalAnimate:
+		move.w player_animTimer,d0
+		add.w #1,d0
+		cmp.w #7,d0
+		beq .animPlayer
+			move.w d0,player_animTimer
+			bra .dontAnim
+		.animPlayer:
+			clr.w player_animTimer
+		.writeTile:
+			move.w player_tileIndex,d0
+			lea PlayerTiles,a0
+			move.w (a0,d0),d1
+			cmp.w #$FFFF,d1
+			bne .notEndList
+				move.w #0,d0
+				move.w (a0),d1
+		.notEndList:
+			add.w #2,d0 ;next word
+			move.w d0,player_tileIndex
+			;correct tile is now in d1
+			move.w #SCB1+(33*64),LSPC_ADDR
+			move.w #2,LSPC_INCR
+			move.w d1,LSPC_DATA
+			add.w #3,d1
+			move.w d1,LSPC_DATA
+	.dontAnim:
 	rts
 	
