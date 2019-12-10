@@ -35,6 +35,7 @@ playerSet:
 	rts
 
 PLAYER_ACCEL equ $8000
+GRAVITY equ $6000
 PLAYER_MAX_SPEED equ $48000
 HORIZ_FLIP equ $1
 PlayerTiles:
@@ -94,19 +95,24 @@ playerMove:
 			move.w d0,LSPC_DATA			
 		.NoRight:
 .doneTests:
-
+	move.l player_xPos,d0
+	add.l player_xSpeed,d0
+	move.l d0,player_xPos
+	
 	btst.b #JOY_UP,d1
 	beq .NoUp
 		sub.l #$30000,player_yPos
 	.NoUp:
+	
 	btst.b #JOY_DOWN,d1
 	beq .NoDown
 		add.l #$30000,player_yPos
 	.NoDown:
-
-	move.l player_xPos,d0
-	add.l player_xSpeed,d0
-	move.l d0,player_xPos
+	
+	; move.l player_ySpeed,d0
+	; add.l #GRAVITY,d0
+	; move.l d0,player_ySpeed
+	; add.l d0,player_yPos
 
 	;animate player based on movement
 	move.w player_xSpeed,d0

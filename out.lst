@@ -614,6 +614,7 @@ F03:0018       player_xSpeed equ player_yPos+4 ;long
 F03:0019       player_ySpeed equ player_xSpeed+4 ;long
 F03:0020       player_animTimer equ player_ySpeed+4 ;word
 F03:0021       player_tileIndex equ player_animTimer+2 ;word, current location in tile array
+F03:0022       player_collision equ player_tileIndex+2 ;word, player collision bitmask
 F00:0009       	
 F00:0010       ;==============================================================================;
 F00:0011       ;-- 68000 header --;
@@ -687,16 +688,16 @@ F04:0041
 F04:0042       ; Interrupts
 F04:0043       	ifd		TARGET_CD		; (Interrupt levels 1 and 2 are swapped on CD systems.)
 F04:0044       		dc.l	IRQ2		; Level 2 interrupt (HBlank)
-               S01:00000064:  00 00 28 64 [R]
+               S01:00000064:  00 00 29 02 [R]
 F04:0045       		dc.l	VBlank		; Level 1 interrupt (VBlank)
-               S01:00000068:  00 00 28 28 [R]
+               S01:00000068:  00 00 28 C6 [R]
 F04:0046       	else
 F04:0047       		dc.l	VBlank		; Level 1 interrupt (VBlank)
 F04:0048       		dc.l	IRQ2		; Level 2 interrupt (HBlank)
 F04:0049       	endif
 F04:0050       
 F04:0051       	dc.l	IRQ3			; Level 3 interrupt
-               S01:0000006C:  00 00 28 74 [R]
+               S01:0000006C:  00 00 29 12 [R]
 F04:0052       	dc.l	$00000000		; Level 4 interrupt
                S01:00000070:  00 00 00 00
 F04:0053       	dc.l	$00000000		; Level 5 interrupt
@@ -812,13 +813,13 @@ F05:0023       	dc.l softDips_Europe	; Software dips for Europe
                S01:0000011E:  00 00 02 88 [R]
 F05:0024       
 F05:0025       	jmp USER			; $122
-               S01:00000122:  4E F9 00 00 27 D6 [R]
+               S01:00000122:  4E F9 00 00 28 74 [R]
 F05:0026       	jmp PLAYER_START	; $128
-               S01:00000128:  4E F9 00 00 28 22 [R]
+               S01:00000128:  4E F9 00 00 28 C0 [R]
 F05:0027       	jmp DEMO_END		; $12E
-               S01:0000012E:  4E F9 00 00 28 24 [R]
+               S01:0000012E:  4E F9 00 00 28 C2 [R]
 F05:0028       	jmp COIN_SOUND		; $134
-               S01:00000134:  4E F9 00 00 28 26 [R]
+               S01:00000134:  4E F9 00 00 28 C4 [R]
 F05:0029       
 F05:0030       	dc.w $FFFF			; $13A: Z80 RAM address for CDDA commands (set to FFFF for default FEF8)
                S01:0000013A:  FF FF
@@ -7462,196 +7463,202 @@ F14:0035       	rts
                S01:000024AA:  4E 75
 F14:0036       
 F14:0037       PLAYER_ACCEL equ $8000
-F14:0038       PLAYER_MAX_SPEED equ $48000
-F14:0039       HORIZ_FLIP equ $1
-F14:0040       PlayerTiles:
-F14:0041       	dc.w 101,100,102,100,$FFFF
+F14:0038       GRAVITY equ $6000
+F14:0039       PLAYER_MAX_SPEED equ $48000
+F14:0040       HORIZ_FLIP equ $1
+F14:0041       PlayerTiles:
+F14:0042       	dc.w 101,100,102,100,$FFFF
                S01:000024AC:  00 65
                S01:000024AE:  00 64
                S01:000024B0:  00 66
                S01:000024B2:  00 64
                S01:000024B4:  FF FF
-F14:0042       playerMove:
-F14:0043       	move.b BIOS_P1CURRENT,d0
+F14:0043       playerMove:
+F14:0044       	move.b BIOS_P1CURRENT,d0
                S01:000024B6:  10 39 00 10 FD 96
-F14:0044       	move.b d0,d1
+F14:0045       	move.b d0,d1
                S01:000024BC:  12 00
-F14:0045       	and.b #$c,d0 ;are either left/right being pressed?
+F14:0046       	and.b #$c,d0 ;are either left/right being pressed?
                S01:000024BE:  C0 3C 00 0C
-F14:0046       	bne .testDirs ;if yes, do normal acceleration stuff
+F14:0047       	bne .testDirs ;if yes, do normal acceleration stuff
                S01:000024C2:  66 00 00 32
-F14:0047       		move.l player_xSpeed,d0
+F14:0048       		move.l player_xSpeed,d0
                S01:000024C6:  20 39 00 10 00 16
-F14:0048       		beq .doneTests
+F14:0049       		beq .doneTests
                S01:000024CC:  67 00 00 E6
-F14:0049       		and.l #$80000000,d0
+F14:0050       		and.l #$80000000,d0
                S01:000024D0:  C0 BC 80 00 00 00
-F14:0050       		beq .subSpeed
+F14:0051       		beq .subSpeed
                S01:000024D6:  67 00 00 10
-F14:0051       		.addSpeed:
-F14:0052       			add.l #PLAYER_ACCEL,player_xSpeed
+F14:0052       		.addSpeed:
+F14:0053       			add.l #PLAYER_ACCEL,player_xSpeed
                S01:000024DA:  06 B9 00 00 80 00 00 10 00 16
-F14:0053       			bra .doneTests
+F14:0054       			bra .doneTests
                S01:000024E4:  60 00 00 CE
-F14:0054       		.subSpeed:
-F14:0055       			sub.l #PLAYER_ACCEL,player_xSpeed
+F14:0055       		.subSpeed:
+F14:0056       			sub.l #PLAYER_ACCEL,player_xSpeed
                S01:000024E8:  04 B9 00 00 80 00 00 10 00 16
-F14:0056       			bra .doneTests
+F14:0057       			bra .doneTests
                S01:000024F2:  60 00 00 C0
-F14:0057       	.testDirs:
-F14:0058       		move.l player_xSpeed,d0
+F14:0058       	.testDirs:
+F14:0059       		move.l player_xSpeed,d0
                S01:000024F6:  20 39 00 10 00 16
-F14:0059       		btst.b #JOY_LEFT,d1
+F14:0060       		btst.b #JOY_LEFT,d1
                S01:000024FC:  08 01 00 02
-F14:0060       		beq .NoLeft
+F14:0061       		beq .NoLeft
                S01:00002500:  67 00 00 56
-F14:0061       			sub.l #PLAYER_ACCEL,player_xSpeed
+F14:0062       			sub.l #PLAYER_ACCEL,player_xSpeed
                S01:00002504:  04 B9 00 00 80 00 00 10 00 16
-F14:0062       			cmp.l #-PLAYER_MAX_SPEED,d0
+F14:0063       			cmp.l #-PLAYER_MAX_SPEED,d0
                S01:0000250E:  B0 BC FF FB 80 00
-F14:0063       			bpl .dontClampLSpeed
+F14:0064       			bpl .dontClampLSpeed
                S01:00002514:  6A 00 00 0C
-F14:0064       				move.l #-PLAYER_MAX_SPEED,player_xSpeed
+F14:0065       				move.l #-PLAYER_MAX_SPEED,player_xSpeed
                S01:00002518:  23 FC FF FB 80 00 00 10 00 16
-F14:0065       			.dontClampLSpeed:
-F14:0066       			;mirror sprite so he's facing left
-F14:0067       			move.w #SCB1+(33*64)+1,LSPC_ADDR
+F14:0066       			.dontClampLSpeed:
+F14:0067       			;mirror sprite so he's facing left
+F14:0068       			move.w #SCB1+(33*64)+1,LSPC_ADDR
                S01:00002522:  33 FC 08 41 00 3C 00 00
-F14:0068       			clr.w LSPC_INCR
+F14:0069       			clr.w LSPC_INCR
                S01:0000252A:  42 79 00 3C 00 04
-F14:0069       			move.w LSPC_DATA,d0
+F14:0070       			move.w LSPC_DATA,d0
                S01:00002530:  30 39 00 3C 00 02
-F14:0070       			or.w #HORIZ_FLIP,d0
+F14:0071       			or.w #HORIZ_FLIP,d0
                S01:00002536:  80 7C 00 01
-F14:0071       			move.w d0,LSPC_DATA
+F14:0072       			move.w d0,LSPC_DATA
                S01:0000253A:  33 C0 00 3C 00 02
-F14:0072       			move.w #SCB1+(33*64)+3,LSPC_ADDR
+F14:0073       			move.w #SCB1+(33*64)+3,LSPC_ADDR
                S01:00002540:  33 FC 08 43 00 3C 00 00
-F14:0073       			move.w LSPC_DATA,d0
+F14:0074       			move.w LSPC_DATA,d0
                S01:00002548:  30 39 00 3C 00 02
-F14:0074       			or.w #HORIZ_FLIP,d0
+F14:0075       			or.w #HORIZ_FLIP,d0
                S01:0000254E:  80 7C 00 01
-F14:0075       			move.w d0,LSPC_DATA
+F14:0076       			move.w d0,LSPC_DATA
                S01:00002552:  33 C0 00 3C 00 02
-F14:0076       			
-F14:0077       		.NoLeft:
-F14:0078       		btst.b #JOY_RIGHT,d1
+F14:0077       			
+F14:0078       		.NoLeft:
+F14:0079       		btst.b #JOY_RIGHT,d1
                S01:00002558:  08 01 00 03
-F14:0079       		beq .NoRight
+F14:0080       		beq .NoRight
                S01:0000255C:  67 00 00 56
-F14:0080       			add.l #PLAYER_ACCEL,player_xSpeed
+F14:0081       			add.l #PLAYER_ACCEL,player_xSpeed
                S01:00002560:  06 B9 00 00 80 00 00 10 00 16
-F14:0081       			cmp.l #PLAYER_MAX_SPEED,d0
+F14:0082       			cmp.l #PLAYER_MAX_SPEED,d0
                S01:0000256A:  B0 BC 00 04 80 00
-F14:0082       			bmi .dontClampRSpeed
+F14:0083       			bmi .dontClampRSpeed
                S01:00002570:  6B 00 00 0C
-F14:0083       				move.l #PLAYER_MAX_SPEED,player_xSpeed
+F14:0084       				move.l #PLAYER_MAX_SPEED,player_xSpeed
                S01:00002574:  23 FC 00 04 80 00 00 10 00 16
-F14:0084       			.dontClampRSpeed:
-F14:0085       			;unmirror sprite just in case :)
-F14:0086       			move.w #SCB1+(33*64)+1,LSPC_ADDR
+F14:0085       			.dontClampRSpeed:
+F14:0086       			;unmirror sprite just in case :)
+F14:0087       			move.w #SCB1+(33*64)+1,LSPC_ADDR
                S01:0000257E:  33 FC 08 41 00 3C 00 00
-F14:0087       			clr.w LSPC_INCR
+F14:0088       			clr.w LSPC_INCR
                S01:00002586:  42 79 00 3C 00 04
-F14:0088       			move.w LSPC_DATA,d0
+F14:0089       			move.w LSPC_DATA,d0
                S01:0000258C:  30 39 00 3C 00 02
-F14:0089       			and.w #~HORIZ_FLIP,d0
+F14:0090       			and.w #~HORIZ_FLIP,d0
                S01:00002592:  C0 7C FF FE
-F14:0090       			move.w d0,LSPC_DATA	
+F14:0091       			move.w d0,LSPC_DATA	
                S01:00002596:  33 C0 00 3C 00 02
-F14:0091       			move.w #SCB1+(33*64)+3,LSPC_ADDR
+F14:0092       			move.w #SCB1+(33*64)+3,LSPC_ADDR
                S01:0000259C:  33 FC 08 43 00 3C 00 00
-F14:0092       			move.w LSPC_DATA,d0
+F14:0093       			move.w LSPC_DATA,d0
                S01:000025A4:  30 39 00 3C 00 02
-F14:0093       			and.w #~HORIZ_FLIP,d0
+F14:0094       			and.w #~HORIZ_FLIP,d0
                S01:000025AA:  C0 7C FF FE
-F14:0094       			move.w d0,LSPC_DATA			
+F14:0095       			move.w d0,LSPC_DATA			
                S01:000025AE:  33 C0 00 3C 00 02
-F14:0095       		.NoRight:
-F14:0096       .doneTests:
-F14:0097       
-F14:0098       	btst.b #JOY_UP,d1
-               S01:000025B4:  08 01 00 00
-F14:0099       	beq .NoUp
-               S01:000025B8:  67 00 00 0C
-F14:0100       		sub.l #$30000,player_yPos
-               S01:000025BC:  04 B9 00 03 00 00 00 10 00 12
-F14:0101       	.NoUp:
-F14:0102       	btst.b #JOY_DOWN,d1
-               S01:000025C6:  08 01 00 01
-F14:0103       	beq .NoDown
+F14:0096       		.NoRight:
+F14:0097       .doneTests:
+F14:0098       	move.l player_xPos,d0
+               S01:000025B4:  20 39 00 10 00 0E
+F14:0099       	add.l player_xSpeed,d0
+               S01:000025BA:  D0 B9 00 10 00 16
+F14:0100       	move.l d0,player_xPos
+               S01:000025C0:  23 C0 00 10 00 0E
+F14:0101       	
+F14:0102       	btst.b #JOY_UP,d1
+               S01:000025C6:  08 01 00 00
+F14:0103       	beq .NoUp
                S01:000025CA:  67 00 00 0C
-F14:0104       		add.l #$30000,player_yPos
-               S01:000025CE:  06 B9 00 03 00 00 00 10 00 12
-F14:0105       	.NoDown:
-F14:0106       
-F14:0107       	move.l player_xPos,d0
-               S01:000025D8:  20 39 00 10 00 0E
-F14:0108       	add.l player_xSpeed,d0
-               S01:000025DE:  D0 B9 00 10 00 16
-F14:0109       	move.l d0,player_xPos
-               S01:000025E4:  23 C0 00 10 00 0E
-F14:0110       
-F14:0111       	;animate player based on movement
-F14:0112       	move.w player_xSpeed,d0
+F14:0104       		sub.l #$30000,player_yPos
+               S01:000025CE:  04 B9 00 03 00 00 00 10 00 12
+F14:0105       	.NoUp:
+F14:0106       	
+F14:0107       	btst.b #JOY_DOWN,d1
+               S01:000025D8:  08 01 00 01
+F14:0108       	beq .NoDown
+               S01:000025DC:  67 00 00 0C
+F14:0109       		add.l #$30000,player_yPos
+               S01:000025E0:  06 B9 00 03 00 00 00 10 00 12
+F14:0110       	.NoDown:
+F14:0111       	
+F14:0112       	; move.l player_ySpeed,d0
+F14:0113       	; add.l #GRAVITY,d0
+F14:0114       	; move.l d0,player_ySpeed
+F14:0115       	; add.l d0,player_yPos
+F14:0116       
+F14:0117       	;animate player based on movement
+F14:0118       	move.w player_xSpeed,d0
                S01:000025EA:  30 39 00 10 00 16
-F14:0113       	bne .normalAnimate
+F14:0119       	bne .normalAnimate
                S01:000025F0:  66 00 00 0E
-F14:0114       		move.w #2,player_tileIndex
+F14:0120       		move.w #2,player_tileIndex
                S01:000025F4:  33 FC 00 02 00 10 00 20
-F14:0115       		bra .writeTile
+F14:0121       		bra .writeTile
                S01:000025FC:  60 00 00 24
-F14:0116       	.normalAnimate:
-F14:0117       		move.w player_animTimer,d0
+F14:0122       	.normalAnimate:
+F14:0123       		move.w player_animTimer,d0
                S01:00002600:  30 39 00 10 00 1E
-F14:0118       		add.w #1,d0
+F14:0124       		add.w #1,d0
                S01:00002606:  D0 7C 00 01
-F14:0119       		cmp.w #7,d0
+F14:0125       		cmp.w #7,d0
                S01:0000260A:  B0 7C 00 07
-F14:0120       		beq .animPlayer
+F14:0126       		beq .animPlayer
                S01:0000260E:  67 00 00 0C
-F14:0121       			move.w d0,player_animTimer
+F14:0127       			move.w d0,player_animTimer
                S01:00002612:  33 C0 00 10 00 1E
-F14:0122       			bra .dontAnim
+F14:0128       			bra .dontAnim
                S01:00002618:  60 00 00 50
-F14:0123       		.animPlayer:
-F14:0124       			clr.w player_animTimer
+F14:0129       		.animPlayer:
+F14:0130       			clr.w player_animTimer
                S01:0000261C:  42 79 00 10 00 1E
-F14:0125       		.writeTile:
-F14:0126       			move.w player_tileIndex,d0
+F14:0131       		.writeTile:
+F14:0132       			move.w player_tileIndex,d0
                S01:00002622:  30 39 00 10 00 20
-F14:0127       			lea PlayerTiles,a0
+F14:0133       			lea PlayerTiles,a0
                S01:00002628:  41 F9 00 00 24 AC [R]
-F14:0128       			move.w (a0,d0),d1
+F14:0134       			move.w (a0,d0),d1
                S01:0000262E:  32 30 00 00
-F14:0129       			cmp.w #$FFFF,d1
+F14:0135       			cmp.w #$FFFF,d1
                S01:00002632:  B2 7C FF FF
-F14:0130       			bne .notEndList
+F14:0136       			bne .notEndList
                S01:00002636:  66 00 00 08
-F14:0131       				move.w #0,d0
+F14:0137       				move.w #0,d0
                S01:0000263A:  30 3C 00 00
-F14:0132       				move.w (a0),d1
+F14:0138       				move.w (a0),d1
                S01:0000263E:  32 10
-F14:0133       		.notEndList:
-F14:0134       			add.w #2,d0 ;next word
+F14:0139       		.notEndList:
+F14:0140       			add.w #2,d0 ;next word
                S01:00002640:  D0 7C 00 02
-F14:0135       			move.w d0,player_tileIndex
+F14:0141       			move.w d0,player_tileIndex
                S01:00002644:  33 C0 00 10 00 20
-F14:0136       			;correct tile is now in d1
-F14:0137       			move.w #SCB1+(33*64),LSPC_ADDR
+F14:0142       			;correct tile is now in d1
+F14:0143       			move.w #SCB1+(33*64),LSPC_ADDR
                S01:0000264A:  33 FC 08 40 00 3C 00 00
-F14:0138       			move.w #2,LSPC_INCR
+F14:0144       			move.w #2,LSPC_INCR
                S01:00002652:  33 FC 00 02 00 3C 00 04
-F14:0139       			move.w d1,LSPC_DATA
+F14:0145       			move.w d1,LSPC_DATA
                S01:0000265A:  33 C1 00 3C 00 02
-F14:0140       			add.w #3,d1
+F14:0146       			add.w #3,d1
                S01:00002660:  D2 7C 00 03
-F14:0141       			move.w d1,LSPC_DATA
+F14:0147       			move.w d1,LSPC_DATA
                S01:00002664:  33 C1 00 3C 00 02
-F14:0142       	.dontAnim:
-F14:0143       	rts
+F14:0148       	.dontAnim:
+F14:0149       	rts
                S01:0000266A:  4E 75
-F14:0144       	
+F14:0150       	
 F00:0024       	include "bg.asm" ;bg simulation routines
 F15:0001       ;background display routines
 F15:0002       SCREEN_COLS equ 20
@@ -7863,6 +7870,139 @@ F16:0016       	move.w (a0,d0),d0
 F16:0017       	rts
                S01:000027D4:  4E 75
 F16:0018       
+F16:0019       ;returns collision bitmask in d0
+F16:0020       ;d0- x pos (word)
+F16:0021       ;d1- y pos (word)
+F16:0022       ;d2- width (word)
+F16:0023       ;d3- height (word)
+F16:0024       ;a0- map address
+F16:0025       COLLISION_LEFT equ 1
+F16:0026       COLLISION_RIGHT equ 2
+F16:0027       COLLISION_UP equ 4
+F16:0028       COLLISION_DOWN equ 8
+F16:0029       collision_check:
+F16:0030       	and.l #$ffff,d0 ;delete top half of regs
+               S01:000027D6:  C0 BC 00 00 FF FF
+F16:0031       	and.l #$ffff,d1
+               S01:000027DC:  C2 BC 00 00 FF FF
+F16:0032       	and.l #$ffff,d2
+               S01:000027E2:  C4 BC 00 00 FF FF
+F16:0033       	and.l #$ffff,d3
+               S01:000027E8:  C6 BC 00 00 FF FF
+F16:0034       	moveq #0,d7 ;clear d7 (temp storage for collision bitmask)
+               S01:000027EE:  7E 00
+F16:0035       	;left check: x = sprite x, y = y + (height/2) - 1
+F16:0036       	move.w d0,d4 ;copy values 
+               S01:000027F0:  38 00
+F16:0037       	move.w d1,d5
+               S01:000027F2:  3A 01
+F16:0038       	move.w d3,d6
+               S01:000027F4:  3C 03
+F16:0039       	lsr.w #1,d6 ;d6 = (height/2) - 1
+               S01:000027F6:  E2 4E
+F16:0040       	sub.w #1,d6
+               S01:000027F8:  9C 7C 00 01
+F16:0041       	add.w d6,d5
+               S01:000027FC:  DA 46
+F16:0042       	
+F16:0043       	and.w #$fff0,d4
+               S01:000027FE:  C8 7C FF F0
+F16:0044       	lsl.w #2,d4
+               S01:00002802:  E5 4C
+F16:0045       	
+F16:0046       	lsr.w #4,d5
+               S01:00002804:  E8 4D
+F16:0047       	lsl.w #2,d5
+               S01:00002806:  E5 4D
+F16:0048       	add.l d5,d4
+               S01:00002808:  D8 85
+F16:0049       	move.w (a0,d4),d6
+               S01:0000280A:  3C 30 40 00
+F16:0050       	beq .noLeft
+               S01:0000280E:  67 00 00 06
+F16:0051       		or.w #COLLISION_LEFT,d7
+               S01:00002812:  8E 7C 00 01
+F16:0052       	.noLeft:
+F16:0053       	;right check: x = sprite x + width - 1, y = y + (height/2) - 1
+F16:0054       	move.w d0,d4 ;copy x pos- reuse y pos from last check
+               S01:00002816:  38 00
+F16:0055       	add.w d2,d4
+               S01:00002818:  D8 42
+F16:0056       	sub.w #1,d4 ;x + width - 1
+               S01:0000281A:  98 7C 00 01
+F16:0057       	
+F16:0058       	and.w #$fff0,d4
+               S01:0000281E:  C8 7C FF F0
+F16:0059       	lsl.w #2,d4
+               S01:00002822:  E5 4C
+F16:0060       	
+F16:0061       	add.l d5,d4
+               S01:00002824:  D8 85
+F16:0062       	move.w (a0,d4),d6
+               S01:00002826:  3C 30 40 00
+F16:0063       	beq .noRight
+               S01:0000282A:  67 00 00 06
+F16:0064       		or.w #COLLISION_RIGHT,d7
+               S01:0000282E:  8E 7C 00 02
+F16:0065       	.noRight:
+F16:0066       	;up check: x = sprite x + (width/2) - 1, y = sprite y
+F16:0067       	move.w d0,d4 ;copy values
+               S01:00002832:  38 00
+F16:0068       	move.w d1,d5
+               S01:00002834:  3A 01
+F16:0069       	move.w d3,d6
+               S01:00002836:  3C 03
+F16:0070       	lsr.w #1,d6 ;d6 = width/2 - 1
+               S01:00002838:  E2 4E
+F16:0071       	sub.w #1,d6
+               S01:0000283A:  9C 7C 00 01
+F16:0072       	add.w d6,d4
+               S01:0000283E:  D8 46
+F16:0073       	
+F16:0074       	and.w #$fff0,d4
+               S01:00002840:  C8 7C FF F0
+F16:0075       	lsl.w #2,d4
+               S01:00002844:  E5 4C
+F16:0076       	
+F16:0077       	lsr.w #4,d5
+               S01:00002846:  E8 4D
+F16:0078       	lsl.w #2,d5
+               S01:00002848:  E5 4D
+F16:0079       	add.l d4,d5
+               S01:0000284A:  DA 84
+F16:0080       	move.w (a0,d5),d6
+               S01:0000284C:  3C 30 50 00
+F16:0081       	beq .noUp
+               S01:00002850:  67 00 00 06
+F16:0082       		or.w #COLLISION_UP,d7
+               S01:00002854:  8E 7C 00 04
+F16:0083       	.noUp:
+F16:0084       	;down check: x = sprite x + (width/2) - 1, y = sprite y + height - 1
+F16:0085       	;reuse x from last time
+F16:0086       	add.w d3,d1
+               S01:00002858:  D2 43
+F16:0087       	sub.w #1,d1
+               S01:0000285A:  92 7C 00 01
+F16:0088       	
+F16:0089       	lsr.w #4,d1
+               S01:0000285E:  E8 49
+F16:0090       	lsl.w #2,d1
+               S01:00002860:  E5 49
+F16:0091       	add.l d1,d4
+               S01:00002862:  D8 81
+F16:0092       	move.w (a0,d4),d6
+               S01:00002864:  3C 30 40 00
+F16:0093       	beq .noDown
+               S01:00002868:  67 00 00 06
+F16:0094       		or.w #COLLISION_DOWN,d7
+               S01:0000286C:  8E 7C 00 08
+F16:0095       	.noDown:
+F16:0096       	move.w d7,d0
+               S01:00002870:  30 07
+F16:0097       	rts
+               S01:00002872:  4E 75
+F16:0098       	
+F16:0099       
 F00:0026       	
 F00:0027       ;******************************************************************************;
 F00:0028       ; == The required routines == ;
@@ -7879,32 +8019,32 @@ F00:0038       ;================================================================
 F00:0039       
 F00:0040       USER:
 F00:0041       	move.b d0,REG_DIPSW ; kick watchdog
-               S01:000027D6:  13 C0 00 30 00 01
+               S01:00002874:  13 C0 00 30 00 01
 F00:0042       	lea $10F300,sp ; set stack pointer to $10F300 (BIOS_WORKRAM)
-               S01:000027DC:  4F F9 00 10 F3 00
+               S01:0000287A:  4F F9 00 10 F3 00
 F00:0043       	move.w #0,LSPC_MODE ; Disable auto-animation and timer interrupts, set auto-anim speed to 0 frames
-               S01:000027E2:  33 FC 00 00 00 3C 00 06
+               S01:00002880:  33 FC 00 00 00 3C 00 06
 F00:0044       	move.w #7,LSPC_IRQ_ACK ; acknowledge all IRQs
-               S01:000027EA:  33 FC 00 07 00 3C 00 0C
+               S01:00002888:  33 FC 00 07 00 3C 00 0C
 F00:0045       
 F00:0046       	move.w #$2000,sr ; Enable VBlank interrupt, go Supervisor
-               S01:000027F2:  46 FC 20 00
+               S01:00002890:  46 FC 20 00
 F00:0047       
 F00:0048       	; Handle user request
 F00:0049       	moveq #0,d0 ; clear all bits of d0
-               S01:000027F6:  70 00
+               S01:00002894:  70 00
 F00:0050       	move.b BIOS_USER_REQUEST,d0 ; put user request value into d0
-               S01:000027F8:  10 39 00 10 FD AE
+               S01:00002896:  10 39 00 10 FD AE
 F00:0051       	lsl.b #2,d0 ; shift value left twice to get offset into tbl_UserRequestCommands
-               S01:000027FE:  E5 08
+               S01:0000289C:  E5 08
 F00:0052       	lea tbl_UserRequestCommands,a0 ; load address of user commands
-               S01:00002800:  41 F9 00 00 28 12 [R]
+               S01:0000289E:  41 F9 00 00 28 B0 [R]
 F00:0053       	movea.l (a0,d0),a0 ; get address from table and offset
-               S01:00002806:  20 70 00 00
+               S01:000028A4:  20 70 00 00
 F00:0054       	jsr (a0) ; jump to subroutine (typically ends with a jmp SYSTEM_RETURN)
-               S01:0000280A:  4E 90
+               S01:000028A8:  4E 90
 F00:0055       	jmp SYSTEM_RETURN ; this is here just in case it doesn't...?
-               S01:0000280C:  4E F9 00 C0 04 44
+               S01:000028AA:  4E F9 00 C0 04 44
 F00:0056       
 F00:0057       ;------------------------------------------------------------------------------;
 F00:0058       ; tbl_UserRequestCommands
@@ -7912,13 +8052,13 @@ F00:0059       ; Table that contains the addresses for each BIOS_USER_REQUEST co
 F00:0060       
 F00:0061       tbl_UserRequestCommands:
 F00:0062       	dc.l User_Initialize ; Command 0 (Initialize)
-               S01:00002812:  00 00 28 96 [R]
+               S01:000028B0:  00 00 29 34 [R]
 F00:0063       	dc.l SYSTEM_RETURN ; Command 1 (Custom Eyecatch, unused)
-               S01:00002816:  00 C0 04 44
+               S01:000028B4:  00 C0 04 44
 F00:0064       	dc.l User_Main ; Command 2 (Demo Game/Game)
-               S01:0000281A:  00 00 28 9C [R]
+               S01:000028B8:  00 00 29 3A [R]
 F00:0065       	dc.l User_Main ; Command 3 (Title Display)
-               S01:0000281E:  00 00 28 9C [R]
+               S01:000028BC:  00 00 29 3A [R]
 F00:0066       
 F00:0067       ;==============================================================================;
 F00:0068       ; PLAYER_START
@@ -7929,7 +8069,7 @@ F00:0072
 F00:0073       PLAYER_START:
 F00:0074       	; In this demo, we don't handle the Start button, or coins, for that matter.
 F00:0075       	rts
-               S01:00002822:  4E 75
+               S01:000028C0:  4E 75
 F00:0076       
 F00:0077       ;==============================================================================;
 F00:0078       ; DEMO_END
@@ -7937,7 +8077,7 @@ F00:0079       ;================================================================
 F00:0080       
 F00:0081       DEMO_END:
 F00:0082       	rts ; we're not doing anything in this routine, so just exit.
-               S01:00002824:  4E 75
+               S01:000028C2:  4E 75
 F00:0083       
 F00:0084       ;==============================================================================;
 F00:0085       ; COIN_SOUND
@@ -7946,7 +8086,7 @@ F00:0087       ;================================================================
 F00:0088       
 F00:0089       COIN_SOUND:
 F00:0090       	rts  ; we're not doing anything in this routine, so just exit.
-               S01:00002826:  4E 75
+               S01:000028C4:  4E 75
 F00:0091       
 F00:0092       ;******************************************************************************;
 F00:0093       ; == Interrupt Routines == ;
@@ -7962,29 +8102,29 @@ F00:0102       ; Vertical blanking interrupt. Called once per frame.
 F00:0103       
 F00:0104       VBlank:
 F00:0105       	btst #7,BIOS_SYSTEM_MODE ; check if the System ROM wants to run its VBlank routine.
-               S01:00002828:  08 39 00 07 00 10 FD 80
+               S01:000028C6:  08 39 00 07 00 10 FD 80
 F00:0106       	bne.s .VBlank_game ; if not, run our VBlank.
-               S01:00002830:  66 06
+               S01:000028CE:  66 06
 F00:0107       	jmp SYSTEM_INT1 ; jump to system ROM's VBlank routine
-               S01:00002832:  4E F9 00 C0 04 38
+               S01:000028D0:  4E F9 00 C0 04 38
 F00:0108       
 F00:0109       .VBlank_game:
 F00:0110       	movem.l d0-d7/a0-a6,-(sp) ; save registers to the stack
-               S01:00002838:  48 E7 FF FE
+               S01:000028D6:  48 E7 FF FE
 F00:0111       	move.w #4,LSPC_IRQ_ACK ; acknowledge the VBlank interrupt
-               S01:0000283C:  33 FC 00 04 00 3C 00 0C
+               S01:000028DA:  33 FC 00 04 00 3C 00 0C
 F00:0112       	move.b d0,REG_DIPSW ; kick the watchdog
-               S01:00002844:  13 C0 00 30 00 01
+               S01:000028E2:  13 C0 00 30 00 01
 F00:0113       
 F00:0114       	; [Things to perform in VBlank]
 F00:0115       	; VBlank is where you should be doing sprite data updates (SCB writes) and
 F00:0116       	; palette RAM updates.
 F00:0117       	;update RAM locations for joypad inputs
 F00:0118       	jsr SYSTEM_IO
-               S01:0000284A:  4E B9 00 C0 04 4A
+               S01:000028E8:  4E B9 00 C0 04 4A
 F00:0119       	; jsr bgUpdate
 F00:0120       	jsr playerSet
-               S01:00002850:  4E B9 00 00 24 64 [R]
+               S01:000028EE:  4E B9 00 00 24 64 [R]
 F00:0121       	; move.w #1,LSPC_INCR
 F00:0122       	; move.w #SCB2+1,LSPC_ADDR
 F00:0123       	; moveq #9,d1 ;10 sprites - 1
@@ -8008,11 +8148,11 @@ F00:0140
 F00:0141       
 F00:0142       .VBlank_end:
 F00:0143       	move.b #0,flag_VBlank ; clear vblank flag so WaitVBlank knows to stop
-               S01:00002856:  13 FC 00 00 00 10 00 00
+               S01:000028F4:  13 FC 00 00 00 10 00 00
 F00:0144       	movem.l (sp)+,d0-d7/a0-a6 ; restore registers from the stack
-               S01:0000285E:  4C DF 7F FF
+               S01:000028FC:  4C DF 7F FF
 F00:0145       	rte
-               S01:00002862:  4E 73
+               S01:00002900:  4E 73
 F00:0146       
 F00:0147       ;==============================================================================;
 F00:0148       ; IRQ2
@@ -8020,11 +8160,11 @@ F00:0149       ; Horizontal blanking interrupt.
 F00:0150       
 F00:0151       IRQ2:
 F00:0152       	move.w #2,LSPC_IRQ_ACK ; ack. interrupt #2 (HBlank)
-               S01:00002864:  33 FC 00 02 00 3C 00 0C
+               S01:00002902:  33 FC 00 02 00 3C 00 0C
 F00:0153       	move.b d0,REG_DIPSW    ; kick watchdog
-               S01:0000286C:  13 C0 00 30 00 01
+               S01:0000290A:  13 C0 00 30 00 01
 F00:0154       	rte
-               S01:00002872:  4E 73
+               S01:00002910:  4E 73
 F00:0155       
 F00:0156       ;==============================================================================;
 F00:0157       ; IRQ3
@@ -8032,11 +8172,11 @@ F00:0158       ; Interrupt for CD systems.
 F00:0159       
 F00:0160       IRQ3:
 F00:0161       	move.w #1,LSPC_IRQ_ACK ; acknowledge interrupt 3
-               S01:00002874:  33 FC 00 01 00 3C 00 0C
+               S01:00002912:  33 FC 00 01 00 3C 00 0C
 F00:0162       	move.b d0,REG_DIPSW ; kick watchdog
-               S01:0000287C:  13 C0 00 30 00 01
+               S01:0000291A:  13 C0 00 30 00 01
 F00:0163       	rte
-               S01:00002882:  4E 73
+               S01:00002920:  4E 73
 F00:0164       
 F00:0165       ;==============================================================================;
 F00:0166       ; WaitVBlank
@@ -8045,14 +8185,14 @@ F00:0168       ; (Not an interrupt routine, but related to it)
 F00:0169       
 F00:0170       WaitVBlank:
 F00:0171       	move.b #1,flag_VBlank ; set vblank flag to 1.
-               S01:00002884:  13 FC 00 01 00 10 00 00
+               S01:00002922:  13 FC 00 01 00 10 00 00
 F00:0172       .WaitVBlank_loop:
 F00:0173       	tst.b flag_VBlank ; check if vblank flag is 0.
-               S01:0000288C:  4A 39 00 10 00 00
+               S01:0000292A:  4A 39 00 10 00 00
 F00:0174       	bne.s .WaitVBlank_loop ; if not zero, loop until it is.
-               S01:00002892:  66 F8
+               S01:00002930:  66 F8
 F00:0175       	rts
-               S01:00002894:  4E 75
+               S01:00002932:  4E 75
 F00:0176       
 F00:0177       ;******************************************************************************;
 F00:0178       ; == USER request routines == ;
@@ -8065,7 +8205,7 @@ F00:0184       	; the backup RAM area (see cart/cd header, "pointer to backup RA
 F00:0185       
 F00:0186       	; in this demo we don't do anything, so just jump to SYSTEM_RETURN.
 F00:0187       	jmp SYSTEM_RETURN
-               S01:00002896:  4E F9 00 C0 04 44
+               S01:00002934:  4E F9 00 C0 04 44
 F00:0188       
 F00:0189       ;==============================================================================;
 F00:0190       ; User_Main
@@ -8079,192 +8219,218 @@ F00:0197       	; (Palette)
 F00:0198       	; The reference color (address $400000) must be set to the darkest possible
 F00:0199       	; color, which is $8000. (Black with the 'dark bit' set.)
 F00:0200       	move.w #$8000,PALETTE_REFERENCE
-               S01:0000289C:  33 FC 80 00 00 40 00 00
+               S01:0000293A:  33 FC 80 00 00 40 00 00
 F00:0201       
 F00:0202       	; Set the background color ($401FFE) to a regular black ($0000).
 F00:0203       	move.w #0,PALETTE_BACKDROP
-               S01:000028A4:  33 FC 00 00 00 40 1F FE
+               S01:00002942:  33 FC 00 00 00 40 1F FE
 F00:0204       
 F00:0205       	; Finally, we need to set a color for the text to display. Set the first
 F00:0206       	; palette entry in the first palette row ($40xxxx) to white ($0FFF).
 F00:0207       	move.w #$0FFF,PALETTES+2
-               S01:000028AC:  33 FC 0F FF 00 40 00 02
+               S01:0000294A:  33 FC 0F FF 00 40 00 02
 F00:0208       
 F00:0209       	; (Fix Layer)
 F00:0210       	; The System ROM provides a command to set up the Fix layer, and it should
 F00:0211       	; typically be called at boot.
 F00:0212       	jsr FIX_CLEAR ; jump to the FIX_CLEAR subroutine
-               S01:000028B4:  4E B9 00 C0 04 C2
+               S01:00002952:  4E B9 00 C0 04 C2
 F00:0213       
 F00:0214       	; (Sprites)
 F00:0215       	; Sprites will need to be initialized as well. The System ROM provides a
 F00:0216       	; routine for this purpose as well.
 F00:0217       	jsr LSP_1st ; jump to the LSP_1st subroutine
-               S01:000028BA:  4E B9 00 C0 04 C8
+               S01:00002958:  4E B9 00 C0 04 C8
 F00:0218       	
 F00:0219       	;clear variables
 F00:0220       	clr.w frame_count
-               S01:000028C0:  42 79 00 10 00 02
+               S01:0000295E:  42 79 00 10 00 02
 F00:0221       	clr.w curr_tile
-               S01:000028C6:  42 79 00 10 00 04
+               S01:00002964:  42 79 00 10 00 04
 F00:0222       	clr.w bg1_xPos
-               S01:000028CC:  42 79 00 10 00 06
+               S01:0000296A:  42 79 00 10 00 06
 F00:0223       	clr.w bg1_yPos
-               S01:000028D2:  42 79 00 10 00 08
+               S01:00002970:  42 79 00 10 00 08
 F00:0224       	clr.w bg1_direction
-               S01:000028D8:  42 79 00 10 00 0A
+               S01:00002976:  42 79 00 10 00 0A
 F00:0225       	clr.w bg1_copiedCol
-               S01:000028DE:  42 79 00 10 00 0C
+               S01:0000297C:  42 79 00 10 00 0C
 F00:0226       	
 F00:0227       	moveq #$1,d0 ;write to palette 1
-               S01:000028E4:  70 01
+               S01:00002982:  70 01
 F00:0228       	lea bgPal,a0
-               S01:000028E6:  41 F9 00 00 22 CC [R]
+               S01:00002984:  41 F9 00 00 22 CC [R]
 F00:0229       	jsr LoadPalette
-               S01:000028EC:  4E B9 00 00 29 DE [R]
+               S01:0000298A:  4E B9 00 00 2A B0 [R]
 F00:0230       	
 F00:0231       	moveq #$2,d0
-               S01:000028F2:  70 02
+               S01:00002990:  70 02
 F00:0232       	lea guyPal,a0
-               S01:000028F4:  41 F9 00 00 22 DC [R]
+               S01:00002992:  41 F9 00 00 22 DC [R]
 F00:0233       	jsr LoadPalette
-               S01:000028FA:  4E B9 00 00 29 DE [R]
+               S01:00002998:  4E B9 00 00 2A B0 [R]
 F00:0234       	
 F00:0235       	;tell MESS_OUT we're busy messing with the data, so don't run.
 F00:0236       	bset.b	#0,BIOS_MESS_BUSY
-               S01:00002900:  08 F9 00 00 00 10 FD C2
+               S01:0000299E:  08 F9 00 00 00 10 FD C2
 F00:0237       	
 F00:0238       	moveq #1,d0
-               S01:00002908:  70 01
+               S01:000029A6:  70 01
 F00:0239       	lea map,a0
-               S01:0000290A:  41 F9 00 00 02 CC [R]
+               S01:000029A8:  41 F9 00 00 02 CC [R]
 F00:0240       	jsr bgLoad
-               S01:00002910:  4E B9 00 00 26 6C [R]
+               S01:000029AE:  4E B9 00 00 26 6C [R]
 F00:0241       	
 F00:0242       	jsr playerInit
-               S01:00002916:  4E B9 00 00 24 08 [R]
+               S01:000029B4:  4E B9 00 00 24 08 [R]
 F00:0243       	
 F00:0244       	bclr.b	#0,BIOS_MESS_BUSY ;tell MESS_OUT it can run again
-               S01:0000291C:  08 B9 00 00 00 10 FD C2
+               S01:000029BA:  08 B9 00 00 00 10 FD C2
 F00:0245       	
 F00:0246       	;play track 2 from the cd
 F00:0247       	moveq #2,d0 ;play track 2 with loop
-               S01:00002924:  70 02
+               S01:000029C2:  70 02
 F00:0248       CDDALoadLoop: ;metal slug 2 waits for this part of BIOS RAM to be non-zero
 F00:0249       	tst.b $10F6D9 ;so it might be important?
-               S01:00002926:  4A 39 00 10 F6 D9
+               S01:000029C4:  4A 39 00 10 F6 D9
 F00:0250       	beq CDDALoadLoop
-               S01:0000292C:  67 00 FF F8
+               S01:000029CA:  67 00 FF F8
 F00:0251       	jsr BIOSF_CDDACMD
-               S01:00002930:  4E B9 00 C0 05 6A
+               S01:000029CE:  4E B9 00 C0 05 6A
 F00:0252       	
 F00:0253       	
 F00:0254       Loop:
 F00:0255       	jsr playerMove
-               S01:00002936:  4E B9 00 00 24 B6 [R]
+               S01:000029D4:  4E B9 00 00 24 B6 [R]
 F00:0256       	
 F00:0257       	move.w player_xPos,d0
-               S01:0000293C:  30 39 00 10 00 0E
+               S01:000029DA:  30 39 00 10 00 0E
 F00:0258       	move.w player_yPos,d1
-               S01:00002942:  32 39 00 10 00 12
+               S01:000029E0:  32 39 00 10 00 12
 F00:0259       	lea map,a0
-               S01:00002948:  41 F9 00 00 02 CC [R]
+               S01:000029E6:  41 F9 00 00 02 CC [R]
 F00:0260       	jsr collision_tileAt
-               S01:0000294E:  4E B9 00 00 27 BC [R]
+               S01:000029EC:  4E B9 00 00 27 BC [R]
 F00:0261       	move.w d0,curr_tile
-               S01:00002954:  33 C0 00 10 00 04
+               S01:000029F2:  33 C0 00 10 00 04
 F00:0262       	
-F00:0263       	add.w #$1,frame_count	
-               S01:0000295A:  06 79 00 01 00 10 00 02
-F00:0264       	moveq #$4,d0
-               S01:00002962:  70 04
-F00:0265       	moveq #$4,d1
-               S01:00002964:  72 04
-F00:0266       	moveq #$3,d2
-               S01:00002966:  74 03
-F00:0267       	lea frame_count,a0
-               S01:00002968:  41 F9 00 10 00 02
-F00:0268       	jsr fix_PrintHexWord
-               S01:0000296E:  4E B9 00 00 23 5C [R]
-F00:0269       	
-F00:0270       	lea BIOS_P1CURRENT,a0
-               S01:00002974:  41 F9 00 10 FD 96
-F00:0271       	moveq #$4,d0
-               S01:0000297A:  70 04
-F00:0272       	moveq #$5,d1
-               S01:0000297C:  72 05
-F00:0273       	moveq #$3,d2
-               S01:0000297E:  74 03
-F00:0274       	jsr fix_PrintHexByte
-               S01:00002980:  4E B9 00 00 23 2A [R]
-F00:0275       
-F00:0276       	lea player_xPos,a0
-               S01:00002986:  41 F9 00 10 00 0E
-F00:0277       	moveq #$4,d0
-               S01:0000298C:  70 04
-F00:0278       	moveq #$6,d1
-               S01:0000298E:  72 06
-F00:0279       	moveq #$3,d2
-               S01:00002990:  74 03
-F00:0280       	jsr fix_PrintHexWord
-               S01:00002992:  4E B9 00 00 23 5C [R]
-F00:0281       
-F00:0282       	lea player_yPos,a0
-               S01:00002998:  41 F9 00 10 00 12
-F00:0283       	moveq #$4,d0
-               S01:0000299E:  70 04
-F00:0284       	moveq #$7,d1
-               S01:000029A0:  72 07
-F00:0285       	moveq #$3,d2
-               S01:000029A2:  74 03
-F00:0286       	jsr fix_PrintHexWord
-               S01:000029A4:  4E B9 00 00 23 5C [R]
-F00:0287       	
-F00:0288       	moveq #4,d0
-               S01:000029AA:  70 04
-F00:0289       	moveq #8,d1
-               S01:000029AC:  72 08
-F00:0290       	moveq #3,d2
-               S01:000029AE:  74 03
-F00:0291       	lea curr_tile,a0
-               S01:000029B0:  41 F9 00 10 00 04
-F00:0292       	jsr fix_PrintHexWord
-               S01:000029B6:  4E B9 00 00 23 5C [R]
-F00:0293       	
-F00:0294       	jsr WaitVBlank
-               S01:000029BC:  4E B9 00 00 28 84 [R]
-F00:0295       	jmp Loop
-               S01:000029C2:  4E F9 00 00 29 36 [R]
-F00:0296       
-F00:0297       str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
-               S01:000029C8:  48 69 2C 20 49 27 6D 20 61 20 4E 65 6F 2D 47 65
-               S01:000029D8:  6F 20 43 44 21
-               S01:000029DD:  FF
-F00:0298       
-F00:0299       ;copies palette into palette ram
-F00:0300       ;d0- palette number to copy to (long)
-F00:0301       ;a0- pointer to palette to copy
-F00:0302       LoadPalette:
-F00:0303       	asl.w #$5,d0 ;multiply d0 by $20 to get where to write in palette ram
-               S01:000029DE:  EB 40
-F00:0304       	add.l #PALETTES,d0
-               S01:000029E0:  D0 BC 00 40 00 00
-F00:0305       	move.l d0,a1 ;address to a1
-               S01:000029E6:  22 40
-F00:0306       	moveq #$F,d0 ;16 colors - 1
-               S01:000029E8:  70 0F
-F00:0307       	.LoadLoop:
-F00:0308       		move.w (a0)+,(a1)+ ;copy stuff from wram to palette ram
-               S01:000029EA:  32 D8
-F00:0309       		dbra d0,.LoadLoop
-               S01:000029EC:  51 C8 FF FC
-F00:0310       	rts
-               S01:000029F0:  4E 75
-F00:0311       	
-F00:0312       	
-F00:0313       
-F00:0314       	
-F00:0315       
+F00:0263       	move.w player_xPos,d0
+               S01:000029F8:  30 39 00 10 00 0E
+F00:0264       	move.w player_yPos,d1
+               S01:000029FE:  32 39 00 10 00 12
+F00:0265       	moveq #16,d2
+               S01:00002A04:  74 10
+F00:0266       	moveq #32,d3
+               S01:00002A06:  76 20
+F00:0267       	lea map,a0
+               S01:00002A08:  41 F9 00 00 02 CC [R]
+F00:0268       	jsr collision_check
+               S01:00002A0E:  4E B9 00 00 27 D6 [R]
+F00:0269       	move.w d0,player_collision
+               S01:00002A14:  33 C0 00 10 00 22
+F00:0270       	
+F00:0271       	add.w #$1,frame_count	
+               S01:00002A1A:  06 79 00 01 00 10 00 02
+F00:0272       	moveq #$4,d0
+               S01:00002A22:  70 04
+F00:0273       	moveq #$4,d1
+               S01:00002A24:  72 04
+F00:0274       	moveq #$3,d2
+               S01:00002A26:  74 03
+F00:0275       	lea frame_count,a0
+               S01:00002A28:  41 F9 00 10 00 02
+F00:0276       	jsr fix_PrintHexWord
+               S01:00002A2E:  4E B9 00 00 23 5C [R]
+F00:0277       	
+F00:0278       	lea BIOS_P1CURRENT,a0
+               S01:00002A34:  41 F9 00 10 FD 96
+F00:0279       	moveq #$4,d0
+               S01:00002A3A:  70 04
+F00:0280       	moveq #$5,d1
+               S01:00002A3C:  72 05
+F00:0281       	moveq #$3,d2
+               S01:00002A3E:  74 03
+F00:0282       	jsr fix_PrintHexByte
+               S01:00002A40:  4E B9 00 00 23 2A [R]
+F00:0283       
+F00:0284       	lea player_xPos,a0
+               S01:00002A46:  41 F9 00 10 00 0E
+F00:0285       	moveq #$4,d0
+               S01:00002A4C:  70 04
+F00:0286       	moveq #$6,d1
+               S01:00002A4E:  72 06
+F00:0287       	moveq #$3,d2
+               S01:00002A50:  74 03
+F00:0288       	jsr fix_PrintHexWord
+               S01:00002A52:  4E B9 00 00 23 5C [R]
+F00:0289       
+F00:0290       	lea player_yPos,a0
+               S01:00002A58:  41 F9 00 10 00 12
+F00:0291       	moveq #$4,d0
+               S01:00002A5E:  70 04
+F00:0292       	moveq #$7,d1
+               S01:00002A60:  72 07
+F00:0293       	moveq #$3,d2
+               S01:00002A62:  74 03
+F00:0294       	jsr fix_PrintHexWord
+               S01:00002A64:  4E B9 00 00 23 5C [R]
+F00:0295       	
+F00:0296       	moveq #4,d0
+               S01:00002A6A:  70 04
+F00:0297       	moveq #8,d1
+               S01:00002A6C:  72 08
+F00:0298       	moveq #3,d2
+               S01:00002A6E:  74 03
+F00:0299       	lea curr_tile,a0
+               S01:00002A70:  41 F9 00 10 00 04
+F00:0300       	jsr fix_PrintHexWord
+               S01:00002A76:  4E B9 00 00 23 5C [R]
+F00:0301       	
+F00:0302       	moveq #4,d0
+               S01:00002A7C:  70 04
+F00:0303       	moveq #9,d1
+               S01:00002A7E:  72 09
+F00:0304       	moveq #3,d2
+               S01:00002A80:  74 03
+F00:0305       	lea player_collision,a0
+               S01:00002A82:  41 F9 00 10 00 22
+F00:0306       	jsr fix_PrintHexWord
+               S01:00002A88:  4E B9 00 00 23 5C [R]
+F00:0307       	
+F00:0308       	jsr WaitVBlank
+               S01:00002A8E:  4E B9 00 00 29 22 [R]
+F00:0309       	jmp Loop
+               S01:00002A94:  4E F9 00 00 29 D4 [R]
+F00:0310       
+F00:0311       str_HelloWorld: dc.b "Hi, I'm a Neo-Geo CD!",$FF
+               S01:00002A9A:  48 69 2C 20 49 27 6D 20 61 20 4E 65 6F 2D 47 65
+               S01:00002AAA:  6F 20 43 44 21
+               S01:00002AAF:  FF
+F00:0312       
+F00:0313       ;copies palette into palette ram
+F00:0314       ;d0- palette number to copy to (long)
+F00:0315       ;a0- pointer to palette to copy
+F00:0316       LoadPalette:
+F00:0317       	asl.w #$5,d0 ;multiply d0 by $20 to get where to write in palette ram
+               S01:00002AB0:  EB 40
+F00:0318       	add.l #PALETTES,d0
+               S01:00002AB2:  D0 BC 00 40 00 00
+F00:0319       	move.l d0,a1 ;address to a1
+               S01:00002AB8:  22 40
+F00:0320       	moveq #$F,d0 ;16 colors - 1
+               S01:00002ABA:  70 0F
+F00:0321       	.LoadLoop:
+F00:0322       		move.w (a0)+,(a1)+ ;copy stuff from wram to palette ram
+               S01:00002ABC:  32 D8
+F00:0323       		dbra d0,.LoadLoop
+               S01:00002ABE:  51 C8 FF FC
+F00:0324       	rts
+               S01:00002AC2:  4E 75
+F00:0325       	
+F00:0326       	
+F00:0327       
+F00:0328       	
+F00:0329       
 
 
 Sections:
@@ -8292,18 +8458,27 @@ F16  collision.asm
 
 
 Symbols:
- LoadPalette .LoadLoop LAB (0x29ea) sec=CODE 
-str_HelloWorld LAB (0x29c8) UNUSED sec=CODE 
-Loop LAB (0x2936) REF sec=CODE 
-CDDALoadLoop LAB (0x2926) sec=CODE 
-LoadPalette LAB (0x29de) REF sec=CODE 
- WaitVBlank .WaitVBlank_loop LAB (0x288c) sec=CODE 
-WaitVBlank LAB (0x2884) REF sec=CODE 
- VBlank .VBlank_end LAB (0x2856) UNUSED sec=CODE 
- VBlank .VBlank_game LAB (0x2838) sec=CODE 
-User_Main LAB (0x289c) REF sec=CODE 
-User_Initialize LAB (0x2896) REF sec=CODE 
-tbl_UserRequestCommands LAB (0x2812) REF sec=CODE 
+ LoadPalette .LoadLoop LAB (0x2abc) sec=CODE 
+str_HelloWorld LAB (0x2a9a) UNUSED sec=CODE 
+Loop LAB (0x29d4) REF sec=CODE 
+CDDALoadLoop LAB (0x29c4) sec=CODE 
+LoadPalette LAB (0x2ab0) REF sec=CODE 
+ WaitVBlank .WaitVBlank_loop LAB (0x292a) sec=CODE 
+WaitVBlank LAB (0x2922) REF sec=CODE 
+ VBlank .VBlank_end LAB (0x28f4) UNUSED sec=CODE 
+ VBlank .VBlank_game LAB (0x28d6) sec=CODE 
+User_Main LAB (0x293a) REF sec=CODE 
+User_Initialize LAB (0x2934) REF sec=CODE 
+tbl_UserRequestCommands LAB (0x28b0) REF sec=CODE 
+ collision_check .noDown LAB (0x2870) sec=CODE 
+ collision_check .noUp LAB (0x2858) sec=CODE 
+ collision_check .noRight LAB (0x2832) sec=CODE 
+ collision_check .noLeft LAB (0x2816) sec=CODE 
+collision_check LAB (0x27d6) REF sec=CODE 
+COLLISION_DOWN EXPR(8=0x8) EQU 
+COLLISION_UP EXPR(4=0x4) EQU 
+COLLISION_RIGHT EXPR(2=0x2) EQU 
+COLLISION_LEFT EXPR(1=0x1) EQU 
 collision_tileAt LAB (0x27bc) REF sec=CODE 
  copyCol .copyLoop LAB (0x27aa) sec=CODE 
  bgSet .doneTests LAB (0x278c) sec=CODE 
@@ -8328,8 +8503,8 @@ SCREEN_COLS EXPR(20=0x14) EQU
  playerMove .animPlayer LAB (0x261c) sec=CODE 
  playerMove .writeTile LAB (0x2622) sec=CODE 
  playerMove .normalAnimate LAB (0x2600) sec=CODE 
- playerMove .NoDown LAB (0x25d8) sec=CODE 
- playerMove .NoUp LAB (0x25c6) sec=CODE 
+ playerMove .NoDown LAB (0x25ea) sec=CODE 
+ playerMove .NoUp LAB (0x25d8) sec=CODE 
  playerMove .dontClampRSpeed LAB (0x257e) sec=CODE 
  playerMove .NoRight LAB (0x25b4) sec=CODE 
  playerMove .dontClampLSpeed LAB (0x2522) sec=CODE 
@@ -8342,6 +8517,7 @@ playerMove LAB (0x24b6) REF sec=CODE
 PlayerTiles LAB (0x24ac) REF sec=CODE 
 HORIZ_FLIP EXPR(1=0x1) EQU 
 PLAYER_MAX_SPEED EXPR(294912=0x48000) EQU 
+GRAVITY EXPR(24576=0x6000) UNUSED EQU 
 PLAYER_ACCEL EXPR(32768=0x8000) EQU 
 playerSet LAB (0x2464) REF sec=CODE 
 playerInit LAB (0x2408) REF sec=CODE 
@@ -8365,16 +8541,17 @@ guyPal LAB (0x22dc) REF sec=CODE
 bgPal LAB (0x22cc) REF sec=CODE 
 map LAB (0x2cc) REF sec=CODE 
 TRAP_CODE LAB (0x186) REF sec=CODE 
-COIN_SOUND LAB (0x2826) REF sec=CODE 
-DEMO_END LAB (0x2824) REF sec=CODE 
-PLAYER_START LAB (0x2822) REF sec=CODE 
-USER LAB (0x27d6) REF sec=CODE 
+COIN_SOUND LAB (0x28c4) REF sec=CODE 
+DEMO_END LAB (0x28c2) REF sec=CODE 
+PLAYER_START LAB (0x28c0) REF sec=CODE 
+USER LAB (0x2874) REF sec=CODE 
 softDips_Europe LAB (0x288) REF sec=CODE 
 softDips_USA LAB (0x244) REF sec=CODE 
 softDips_Japan LAB (0x200) REF sec=CODE 
-IRQ3 LAB (0x2874) REF sec=CODE 
-VBlank LAB (0x2828) REF sec=CODE 
-IRQ2 LAB (0x2864) REF sec=CODE 
+IRQ3 LAB (0x2912) REF sec=CODE 
+VBlank LAB (0x28c6) REF sec=CODE 
+IRQ2 LAB (0x2902) REF sec=CODE 
+player_collision EXPR(1048610=0x100022) EQU 
 player_tileIndex EXPR(1048608=0x100020) EQU 
 player_animTimer EXPR(1048606=0x10001e) EQU 
 player_ySpeed EXPR(1048602=0x10001a) EQU 

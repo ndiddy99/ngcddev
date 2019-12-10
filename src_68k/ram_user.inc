@@ -19,3 +19,4 @@ player_xSpeed equ player_yPos+4 ;long
 player_ySpeed equ player_xSpeed+4 ;long
 player_animTimer equ player_ySpeed+4 ;word
 player_tileIndex equ player_animTimer+2 ;word, current location in tile array
+player_collision equ player_tileIndex+2 ;word, player collision bitmask
