@@ -31,6 +31,9 @@ collision_check:
 	and.l #$ffff,d1
 	and.l #$ffff,d2
 	and.l #$ffff,d3
+	moveq #0,d4 ;clear regs
+	moveq #0,d5
+	moveq #0,d6
 	moveq #0,d7 ;clear d7 (temp storage for collision bitmask)
 	;left check: x = sprite x, y = y + (height/2) - 1
 	move.w d0,d4 ;copy values 
@@ -66,7 +69,7 @@ collision_check:
 	;up check: x = sprite x + (width/2) - 1, y = sprite y
 	move.w d0,d4 ;copy values
 	move.w d1,d5
-	move.w d3,d6
+	move.w d2,d6
 	lsr.w #1,d6 ;d6 = width/2 - 1
 	sub.w #1,d6
 	add.w d6,d4
