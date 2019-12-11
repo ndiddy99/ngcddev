@@ -108,11 +108,6 @@ playerMove:
 	beq .NoDown
 		add.l #$30000,player_yPos
 	.NoDown:
-	
-	; move.l player_ySpeed,d0
-	; add.l #GRAVITY,d0
-	; move.l d0,player_ySpeed
-	; add.l d0,player_yPos
 
 	;animate player based on movement
 	move.w player_xSpeed,d0
@@ -146,5 +141,24 @@ playerMove:
 			add.w #3,d1
 			move.w d1,LSPC_DATA
 	.dontAnim:
+	;collision/gravity stuff
+	move.w player_xPos,d0
+	move.w player_yPos,d1
+	moveq #16,d2 ;player width
+	moveq #32,d3 ;player height
+	lea map,a0
+	jsr collision_check
+	move.w d0,player_collision
+	
+	;gravity
+	; move.l player_ySpeed,d0
+	; add.l #GRAVITY,d0
+	; move.l d0,player_ySpeed
+	; add.l d0,player_yPos
+	
+	and.w #COLLISION_DOWN,d0
+	bne .onGround
+		add.l #$10000,player_yPos
+	.onGround:
 	rts
 	

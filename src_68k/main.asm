@@ -260,13 +260,7 @@ Loop:
 	jsr collision_tileAt
 	move.w d0,curr_tile
 	
-	move.w player_xPos,d0
-	move.w player_yPos,d1
-	moveq #16,d2
-	moveq #32,d3
-	lea map,a0
-	jsr collision_check
-	move.w d0,player_collision
+	
 	
 	add.w #$1,frame_count	
 	moveq #$4,d0

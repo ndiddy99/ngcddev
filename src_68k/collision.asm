@@ -26,6 +26,10 @@ COLLISION_LEFT equ 1
 COLLISION_RIGHT equ 2
 COLLISION_UP equ 4
 COLLISION_DOWN equ 8
+COLLISION_TOPLEFT equ 16
+COLLISION_TOPRIGHT equ 32
+COLLISION_BOTLEFT equ 64
+COLLISION_BOTRIGHT equ 128
 collision_check:
 	and.l #$ffff,d0 ;delete top half of regs
 	and.l #$ffff,d1
@@ -35,67 +39,85 @@ collision_check:
 	moveq #0,d5
 	moveq #0,d6
 	moveq #0,d7 ;clear d7 (temp storage for collision bitmask)
-	;left check: x = sprite x, y = y + (height/2) - 1
+	;top left: x = sprite x, y = sprite y
 	move.w d0,d4 ;copy values 
 	move.w d1,d5
-	move.w d3,d6
-	lsr.w #1,d6 ;d6 = (height/2) - 1
-	sub.w #1,d6
-	add.w d6,d5
-	
-	and.w #$fff0,d4
+	and.w #$fff0,d4 ;same as x >> 4 * 64
 	lsl.w #2,d4
 	
-	lsr.w #4,d5
+	lsr.w #4,d5 ;same as (y/16)*4
 	lsl.w #2,d5
 	add.l d5,d4
 	move.w (a0,d4),d6
-	beq .noLeft
-		or.w #COLLISION_LEFT,d7
-	.noLeft:
-	;right check: x = sprite x + width - 1, y = y + (height/2) - 1
+	beq .noTopLeft
+		or.w #COLLISION_TOPLEFT,d7
+	.noTopLeft:
+	;top right: x = sprite x + (width - 1), y = sprite y
 	move.w d0,d4 ;copy x pos- reuse y pos from last check
 	add.w d2,d4
 	sub.w #1,d4 ;x + width - 1
-	
 	and.w #$fff0,d4
 	lsl.w #2,d4
 	
 	add.l d5,d4
 	move.w (a0,d4),d6
-	beq .noRight
-		or.w #COLLISION_RIGHT,d7
-	.noRight:
-	;up check: x = sprite x + (width/2) - 1, y = sprite y
+	beq .noTopRight
+		or.w #COLLISION_TOPRIGHT,d7
+	.noTopRight:
+	;bottom left: x = sprite x, y = sprite y + (height-1)
 	move.w d0,d4 ;copy values
 	move.w d1,d5
-	move.w d2,d6
-	lsr.w #1,d6 ;d6 = width/2 - 1
-	sub.w #1,d6
-	add.w d6,d4
+	add.w d3,d5
+	sub.w #1,d5
 	
 	and.w #$fff0,d4
 	lsl.w #2,d4
 	
 	lsr.w #4,d5
 	lsl.w #2,d5
-	add.l d4,d5
-	move.w (a0,d5),d6
+	add.l d5,d4
+	move.w (a0,d4),d6
+	beq .noBotLeft
+		or.w #COLLISION_BOTLEFT,d7
+	.noBotLeft:
+	;bottom right: x = sprite x + (width-1), y = sprite y + (height-1)
+	move.w d0,d4
+	add.w d2,d4
+	sub.w #1,d4 ;reuse y pos from last time
+	and.w #$fff0,d4
+	lsl.w #2,d4
+
+	add.l d5,d4
+	move.w (a0,d4),d6
+	beq .noBotRight
+		or.w #COLLISION_BOTRIGHT,d7
+	.noBotRight:
+	
+	;left collision: top or bottom left
+	move.w d7,d0
+	and.w #(COLLISION_TOPLEFT|COLLISION_BOTLEFT),d0
+	beq .noLeft
+		or.w #COLLISION_LEFT,d7
+	.noLeft:
+	;right collision: top or bottom right
+	move.w d7,d0
+	and.w #(COLLISION_TOPRIGHT|COLLISION_BOTRIGHT),d0
+	beq .noRight
+		or.w #COLLISION_RIGHT,d7
+	.noRight:	
+	;top collision: top left or top right
+	move.w d7,d0
+	and.w #(COLLISION_TOPLEFT|COLLISION_TOPRIGHT),d0
 	beq .noUp
 		or.w #COLLISION_UP,d7
-	.noUp:
-	;down check: x = sprite x + (width/2) - 1, y = sprite y + height - 1
-	;reuse x from last time
-	add.w d3,d1
-	sub.w #1,d1
-	
-	lsr.w #4,d1
-	lsl.w #2,d1
-	add.l d1,d4
-	move.w (a0,d4),d6
+	.noUp:	
+	;bottom collision: bottom left or bottom right
+	move.w d7,d0
+	and.w #(COLLISION_BOTLEFT|COLLISION_BOTRIGHT),d0
 	beq .noDown
 		or.w #COLLISION_DOWN,d7
 	.noDown:
+	
 	move.w d7,d0
 	rts
 	
